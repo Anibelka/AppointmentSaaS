@@ -144,3 +144,15 @@ input,select{width:100%;border:1px solid var(--border);background:#fff;color:var
 
 /* Paquetes Básico/Pro, historial y exportaciones */
 .form-mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}.form-mode-tab{border:1px solid var(--border);background:#f5f7fb;color:var(--muted);border-radius:10px;padding:10px 8px;font-size:11px;font-weight:900}.form-mode-tab.active{background:var(--blue);border-color:var(--blue);color:#fff}.compact-notice{margin:0 0 4px!important}.module-actions{display:flex;justify-content:flex-end;margin:-4px 0 15px}.pro-action:disabled{opacity:.55;cursor:not-allowed;transform:none}#notificationsBusinessView.plan-locked>.pro-content,#auditBusinessView.plan-locked>.pro-content,#brandingPanel.plan-locked>.pro-content,#analyticsBusinessView.plan-locked>.pro-content{filter:blur(2px);opacity:.34;pointer-events:none;user-select:none}.notification-statuses{display:flex;flex-direction:column;gap:5px;align-items:flex-end}.client-tag{display:inline-flex;margin-left:8px;padding:3px 7px;border-radius:999px;background:#e8f7ef;color:var(--success);font-size:9px;font-weight:900;vertical-align:middle}.branding-panel{margin:18px 0}.branding-preview{width:64px;height:64px;border-radius:18px;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:950;font-size:20px;box-shadow:0 12px 30px rgba(15,27,61,.14)}input[type="color"]{height:47px;padding:5px}.plan-option ul{min-height:150px}@media(max-width:760px){.notification-statuses{align-items:flex-start}.module-actions{justify-content:stretch}.module-actions .btn{width:100%}}
+
+
+/* Directorio de clientes */
+.client-mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px;border:1px solid var(--border);border-radius:12px;background:#f6f8fc}
+.client-mode-tab{border:0;border-radius:9px;padding:10px 8px;background:transparent;color:var(--muted);font-size:11px;font-weight:900;cursor:pointer}
+.client-mode-tab.active{background:#fff;color:var(--blue);box-shadow:0 5px 18px rgba(24,39,75,.09)}
+.client-existing-block{display:flex;flex-direction:column;gap:7px}
+.field-hint{margin:-1px 2px 2px;color:var(--muted);font-size:10px;line-height:1.45}
+input[readonly]{background:#f5f7fb;color:#58647b;cursor:not-allowed}
+.client-type-badge{display:inline-flex;align-items:center;margin-left:8px;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:900;vertical-align:middle}
+.client-type-badge.account{background:#e8f7ef;color:var(--success)}
+.client-type-badge.crm{background:#fff4d8;color:var(--warning)}

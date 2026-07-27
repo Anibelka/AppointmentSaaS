@@ -76,18 +76,21 @@ const Cloud = {
     if (businessError) throw businessError;
     this.business = business;
 
-    const [servicesResult, staffResult, hoursResult, closuresResult, appointmentsResult, auditResult] = await Promise.all([
+    const [servicesResult, staffResult, hoursResult, closuresResult, appointmentsResult, clientsResult, auditResult] = await Promise.all([
       this.client.from('services').select('*').eq('business_id', business.id).order('id'),
       this.client.from('staff').select('*').eq('business_id', business.id).order('id'),
       this.client.from('business_hours').select('*').eq('business_id', business.id).order('day_of_week'),
       this.client.from('business_closures').select('*').eq('business_id', business.id).order('closure_date'),
       this.client.from('appointments').select('*').eq('business_id', business.id).order('starts_at'),
       this.profile?.role === 'admin'
+        ? this.client.from('clients').select('*').eq('business_id', business.id).eq('active', true).order('full_name')
+        : Promise.resolve({ data: [], error: null }),
+      this.profile?.role === 'admin'
         ? this.client.from('audit_logs').select('*').eq('business_id', business.id).order('created_at', { ascending: false }).limit(80)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
-    for (const result of [servicesResult, staffResult, hoursResult, closuresResult, appointmentsResult, auditResult]) {
+    for (const result of [servicesResult, staffResult, hoursResult, closuresResult, appointmentsResult, clientsResult, auditResult]) {
       if (result.error) throw result.error;
     }
 
@@ -125,6 +128,15 @@ const Cloud = {
         h2: business.notification_2h,
       },
       clientAccounts: [],
+      clients: clientsResult.data.map(row => ({
+        id: Number(row.id),
+        profileId: row.profile_id,
+        name: row.full_name,
+        phone: row.phone || '',
+        email: row.email,
+        registered: Boolean(row.profile_id),
+        active: row.active,
+      })),
       services: servicesResult.data.map(row => ({
         id: Number(row.id),
         name: row.name,
@@ -156,6 +168,7 @@ const Cloud = {
       id: Number(row.id),
       code: row.confirmation_code,
       clientId: row.client_id,
+      clientRecordId: row.client_record_id ? Number(row.client_record_id) : null,
       client: row.client_name,
       phone: row.client_phone,
       email: row.client_email,

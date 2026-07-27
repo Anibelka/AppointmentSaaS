@@ -105,6 +105,11 @@ function createInitialState() {
     clientAccounts: [
       { id: 9001, name: "Luis Gómez", phone: "809-555-2211", email: "cliente@appointmentsaas.com", password: "Cliente123!" }
     ],
+    clients: [
+      { id: 1, profileId: 9001, name: "Luis Gómez", phone: "809-555-2211", email: "cliente@appointmentsaas.com", registered: true, active: true },
+      { id: 2, profileId: null, name: "José Ramírez", phone: "809-555-1001", email: "jose.ramirez@example.com", registered: false, active: true },
+      { id: 3, profileId: null, name: "Rafael Santos", phone: "829-555-1005", email: "rafael.santos@example.com", registered: false, active: true }
+    ],
     services: [
       { id: 1, name: "Corte", price: 700, duration: 30, description: "Corte clásico o moderno según preferencia.", active: true },
       { id: 2, name: "Corte + Barba", price: 1200, duration: 45, description: "Servicio completo de corte y arreglo de barba.", active: true },
@@ -142,7 +147,7 @@ let currentBusinessView = "dashboard";
 function loadState() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (parsed?.business?.schedule && parsed?.clientAccounts) return parsed;
+    if (parsed?.business?.schedule && parsed?.clientAccounts) { if(!Array.isArray(parsed.clients)) parsed.clients=[]; return parsed; }
   } catch {}
   return createInitialState();
 }
@@ -851,16 +856,44 @@ function visibleAppointments(includeCancelled=true){
   if(s?.role==="employee")list=list.filter(a=>a.staffId===s.staffId);
   return includeCancelled?list:list.filter(a=>a.status!=="Cancelada");
 }
+function clientDirectory(){
+  const map=new Map();
+  (state.clients||[]).filter(c=>c.active!==false).forEach(c=>{
+    const key=(c.email||c.phone||String(c.id)).toLowerCase();
+    map.set(key,{id:c.id||null,profileId:c.profileId||null,name:c.name,phone:c.phone||"",email:c.email||"",registered:Boolean(c.registered||c.profileId),active:true});
+  });
+  (state.clientAccounts||[]).forEach(c=>{
+    const key=(c.email||c.phone||String(c.id)).toLowerCase();
+    if(!map.has(key))map.set(key,{id:c.id||null,profileId:c.id||null,name:c.name,phone:c.phone||"",email:c.email||"",registered:true,active:true});
+  });
+  state.appointments.forEach(a=>{
+    const key=(a.email||a.phone||String(a.clientRecordId||a.id)).toLowerCase();
+    if(!map.has(key))map.set(key,{id:a.clientRecordId||null,profileId:a.clientId||null,name:a.client,phone:a.phone||"",email:a.email||"",registered:Boolean(a.clientId),active:true});
+  });
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,"es"));
+}
 function appointmentClients(list=visibleAppointments()){
   const map=new Map();
+  clientDirectory().forEach(c=>{
+    const key=(c.email||c.phone||String(c.id)).toLowerCase();
+    map.set(key,{...c,visits:0,revenue:0,lastDate:""});
+  });
   list.forEach(a=>{
-    const key=a.email||a.phone;
-    if(!map.has(key))map.set(key,{name:a.client,phone:a.phone,email:a.email,visits:0,revenue:0,lastDate:a.date});
+    const key=(a.email||a.phone||String(a.clientRecordId||a.id)).toLowerCase();
+    if(!map.has(key))map.set(key,{id:a.clientRecordId||null,profileId:a.clientId||null,name:a.client,phone:a.phone,email:a.email,registered:Boolean(a.clientId),visits:0,revenue:0,lastDate:""});
     const c=map.get(key);
     if(!["Cancelada","No asistió"].includes(a.status)){c.visits++;c.revenue+=priceOf(a);}
-    if(a.date>c.lastDate)c.lastDate=a.date;
+    if(!c.lastDate||a.date>c.lastDate)c.lastDate=a.date;
   });
-  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name));
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,"es"));
+}
+function upsertLocalClient(payload){
+  state.clients=state.clients||[];
+  const email=payload.email.toLowerCase();
+  let client=state.clients.find(c=>(c.email||"").toLowerCase()===email);
+  if(client){client.name=payload.client;client.phone=payload.phone;client.active=true;}
+  else{client={id:Date.now(),profileId:null,name:payload.client,phone:payload.phone,email,registered:false,active:true};state.clients.push(client);}
+  return client;
 }
 function serviceStats(list=state.appointments){
   return state.services.map(s=>{const apps=list.filter(a=>a.serviceId===s.id&&!["Cancelada","No asistió"].includes(a.status));return{name:s.name,count:apps.length,revenue:apps.reduce((sum,a)=>sum+s.price,0)};}).sort((a,b)=>b.revenue-a.revenue);
@@ -912,8 +945,51 @@ function renderDashboard(){
   $("#dashboardAppointments").innerHTML=dashboardList.map(a=>appointmentRow(a,false)).join("")||`<div class="empty-state">No hay citas registradas.</div>`;
   $("#quickPeak").textContent=hs[0]?formatTime(hs[0].time):"—";$("#quickTopService").textContent=ss[0]?.name||"—";$("#quickNextClient").textContent=next?.client||"—";$("#quickCancelRate").textContent=rate+"%";
 }
+function clientFormConfig(scope){
+  return scope==="history"
+    ? {select:"#historyExistingClientSelect",block:"#historyExistingClientBlock",hint:"#historyClientDirectoryHint",name:"#historyClientName",phone:"#historyClientPhone",email:"#historyClientEmail"}
+    : {select:"#adminExistingClientSelect",block:"#adminExistingClientBlock",hint:"#adminClientDirectoryHint",name:"#adminClientName",phone:"#adminClientPhone",email:"#adminClientEmail"};
+}
+function fillClientFields(scope,client){
+  const c=clientFormConfig(scope);
+  $(c.name).value=client?.name||"";
+  $(c.phone).value=client?.phone||"";
+  $(c.email).value=client?.email||"";
+}
+function applyExistingClient(scope){
+  const c=clientFormConfig(scope),value=$(c.select).value;
+  const client=clientDirectory().find(item=>String(item.id??item.email)===value);
+  fillClientFields(scope,client||null);
+  if(client)$(c.hint).textContent=client.registered?"Cliente con cuenta: la cita también aparecerá en su portal.":"Cliente guardado en el CRM del negocio.";
+}
+function setClientMode(scope,mode,keepSelection=false){
+  const c=clientFormConfig(scope);
+  $$(`[data-client-mode-scope="${scope}"]`).forEach(button=>button.classList.toggle("active",button.dataset.clientMode===mode));
+  $(c.block).classList.toggle("hidden",mode!=="existing");
+  [c.name,c.phone,c.email].forEach(selector=>$(selector).readOnly=mode==="existing");
+  $(c.select).dataset.mode=mode;
+  if(mode==="existing"){
+    const directory=clientDirectory();
+    if(!directory.length){$(c.hint).textContent="Todavía no hay clientes en el CRM.";setClientMode(scope,"new");return;}
+    if(!keepSelection||!$(c.select).value)$(c.select).value=String(directory[0].id??directory[0].email);
+    applyExistingClient(scope);
+  }else if(!keepSelection){
+    $(c.select).value="";
+    fillClientFields(scope,null);
+  }
+}
+function populateClientSelectors(){
+  const directory=clientDirectory();
+  const options=directory.map(c=>`<option value="${escapeHtml(String(c.id??c.email))}">${escapeHtml(c.name)} · ${escapeHtml(c.phone||c.email)}${c.registered?" · Con cuenta":""}</option>`).join("");
+  ["admin","history"].forEach(scope=>{
+    const c=clientFormConfig(scope),previous=$(c.select).value;
+    $(c.select).innerHTML=options||'<option value="">No hay clientes registrados</option>';
+    if(previous&&directory.some(item=>String(item.id??item.email)===previous))$(c.select).value=previous;
+    setClientMode(scope,$(c.select).dataset.mode||"existing",true);
+  });
+}
 function populateAdminSelects(){
-  const serviceOptions=planServices().map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · ${currency(s.price)}</option>`).join("");const staffOptions=planStaff().map(p=>`<option value="${p.id}">${escapeHtml(p.name)} · ${escapeHtml(p.specialty)}</option>`).join("");$("#adminServiceSelect").innerHTML=serviceOptions;$("#adminStaffSelect").innerHTML=staffOptions;if($("#historyServiceSelect"))$("#historyServiceSelect").innerHTML=serviceOptions;if($("#historyStaffSelect"))$("#historyStaffSelect").innerHTML=staffOptions;$("#adminDate").min=zonedToday();if(!$("#adminDate").value)$("#adminDate").value=zonedToday();const schedule=scheduleForDate($("#adminDate").value);if(!$("#adminTime").value)$("#adminTime").value=schedule.open?schedule.start:"09:00";if($("#historyDate")){ $("#historyDate").max=zonedToday();if(!$("#historyDate").value)$("#historyDate").value=dateOffset(-1);}if($("#historyTime")&&!$("#historyTime").value)$("#historyTime").value="10:00";
+  const serviceOptions=planServices().map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · ${currency(s.price)}</option>`).join("");const staffOptions=planStaff().map(p=>`<option value="${p.id}">${escapeHtml(p.name)} · ${escapeHtml(p.specialty)}</option>`).join("");$("#adminServiceSelect").innerHTML=serviceOptions;$("#adminStaffSelect").innerHTML=staffOptions;if($("#historyServiceSelect"))$("#historyServiceSelect").innerHTML=serviceOptions;if($("#historyStaffSelect"))$("#historyStaffSelect").innerHTML=staffOptions;$("#adminDate").min=zonedToday();if(!$("#adminDate").value)$("#adminDate").value=zonedToday();const schedule=scheduleForDate($("#adminDate").value);if(!$("#adminTime").value)$("#adminTime").value=schedule.open?schedule.start:"09:00";if($("#historyDate")){ $("#historyDate").max=zonedToday();if(!$("#historyDate").value)$("#historyDate").value=dateOffset(-1);}if($("#historyTime")&&!$("#historyTime").value)$("#historyTime").value="10:00";populateClientSelectors();
 }
 function renderAppointments(){
   const q=$("#appointmentSearch").value.trim().toLowerCase(),f=$("#appointmentStatusFilter").value;
@@ -953,9 +1029,13 @@ function renderAppointments(){
 function renderClients(){
   const q=$("#clientSearch").value.trim().toLowerCase(),list=appointmentClients(visibleAppointments(true)).filter(c=>!q||c.name.toLowerCase().includes(q)||c.phone.includes(q)||c.email.toLowerCase().includes(q));
   const employee=getBusinessSession()?.role==="employee";
-  const headers=employee?"<tr><th>Cliente</th><th>Contacto</th><th>Citas</th><th>Última cita</th></tr>":"<tr><th>Cliente</th><th>Contacto</th><th>Citas</th><th>Ingresos</th><th>Última cita</th></tr>";
-  const rows=list.map(c=>employee?`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${formatDate(c.lastDate)}</td></tr>`:`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${currency(c.revenue)}</td><td>${formatDate(c.lastDate)}</td></tr>`).join("");
-  $("#clientsTable").innerHTML=`<table><thead>${headers}</thead><tbody>${rows||`<tr><td colspan="${employee?4:5}">Sin resultados.</td></tr>`}</tbody></table>`;
+  const headers=employee?"<tr><th>Cliente</th><th>Contacto</th><th>Citas</th><th>Última cita</th></tr>":"<tr><th>Cliente</th><th>Contacto</th><th>Tipo</th><th>Citas</th><th>Ingresos</th><th>Última cita</th></tr>";
+  const badge=c=>c.registered?'<span class="client-type-badge account">Con cuenta</span>':'<span class="client-type-badge crm">CRM</span>';
+  const rows=list.map(c=>employee
+    ?`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${c.lastDate?formatDate(c.lastDate):"Sin citas"}</td></tr>`
+    :`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${badge(c)}</td><td>${c.visits}</td><td>${currency(c.revenue)}</td><td>${c.lastDate?formatDate(c.lastDate):"Sin citas"}</td></tr>`
+  ).join("");
+  $("#clientsTable").innerHTML=`<table><thead>${headers}</thead><tbody>${rows||`<tr><td colspan="${employee?4:6}">Sin resultados.</td></tr>`}</tbody></table>`;
 }
 function renderServices(){
   $("#servicesAdminList").innerHTML=state.services.map(s=>`<div class="admin-service-row"><div><strong>${escapeHtml(s.name)}</strong><span>${escapeHtml(s.description)} · ${s.duration} min · ${s.active?"Activo":"Inactivo"}</span></div><div class="appointment-actions"><span class="price-tag">${currency(s.price)}</span><button class="mini-btn" data-service-toggle="${s.id}">${s.active?"Desactivar":"Activar"}</button></div></div>`).join("");
@@ -997,11 +1077,15 @@ function renderEmailSettings(){const status=$("#cloudEmailStatusText");if(status
 function csvEscape(value){const text=String(value??"");return `"${text.replaceAll('"','""')}"`;}
 function downloadCsv(filename,rows){const csv="\ufeff"+rows.map(row=>row.map(csvEscape).join(",")).join("\r\n");downloadText(filename,csv,"text/csv;charset=utf-8");}
 function exportAppointmentsCsv(){if(!requirePro("La exportación de citas"))return;const rows=[["Código","Cliente","Teléfono","Correo","Servicio","Profesional","Fecha","Hora","Estado","Origen","Precio"]];sortAppointmentsDesc(state.appointments).forEach(a=>rows.push([a.code,a.client,a.phone,a.email,getService(a.serviceId)?.name||"",getStaff(a.staffId)?.name||"",a.date,a.time,a.status,a.source,priceOf(a)]));downloadCsv(`appointmentsaas-citas-${zonedToday()}.csv`,rows);addAudit("Reporte CSV de citas exportado");}
-function exportClientsCsv(){if(!requirePro("La exportación de clientes"))return;const rows=[["Cliente","Teléfono","Correo","Citas válidas","Ingresos asociados","Última cita"]];appointmentClients(state.appointments).forEach(c=>rows.push([c.name,c.phone,c.email,c.visits,c.revenue,c.lastDate]));downloadCsv(`appointmentsaas-clientes-${zonedToday()}.csv`,rows);addAudit("Reporte CSV de clientes exportado");}
+function exportClientsCsv(){if(!requirePro("La exportación de clientes"))return;const rows=[["Cliente","Teléfono","Correo","Tipo","Citas válidas","Ingresos asociados","Última cita"]];appointmentClients(state.appointments).forEach(c=>rows.push([c.name,c.phone,c.email,c.registered?"Con cuenta":"CRM",c.visits,c.revenue,c.lastDate]));downloadCsv(`appointmentsaas-clientes-${zonedToday()}.csv`,rows);addAudit("Reporte CSV de clientes exportado");}
 function exportAnalyticsCsv(){if(!requirePro("El resumen analítico"))return;const clients=appointmentClients(state.appointments),completed=state.appointments.filter(a=>a.status==="Completada"),noShows=state.appointments.filter(a=>a.status==="No asistió"),cancelled=state.appointments.filter(a=>a.status==="Cancelada");const rows=[["Indicador","Valor"],["Negocio",state.business.name],["Fecha de exportación",zonedToday()],["Citas totales",state.appointments.length],["Citas completadas",completed.length],["No asistieron",noShows.length],["Canceladas",cancelled.length],["Clientes únicos",clients.length],["Clientes recurrentes",clients.filter(c=>c.visits>1).length],["Ingresos completados",completed.reduce((s,a)=>s+priceOf(a),0)],["Ingresos potenciales perdidos",[...noShows,...cancelled].reduce((s,a)=>s+priceOf(a),0)]];downloadCsv(`appointmentsaas-resumen-${zonedToday()}.csv`,rows);addAudit("Resumen analítico CSV exportado");}
 function renderAll(){
   renderBusinessIdentity();renderPublicHome();renderPlanUI();applyRoleUI();populateAdminSelects();renderDashboard();renderAppointments();renderClients();renderServices();renderStaff();renderAnalytics();renderNotifications();renderAudit();renderWeeklySchedule();renderClosures();renderEmailSettings();renderClientHeader();
 }
+
+$$("[data-client-mode-scope]").forEach(button=>button.addEventListener("click",()=>setClientMode(button.dataset.clientModeScope,button.dataset.clientMode)));
+$("#adminExistingClientSelect").addEventListener("change",()=>applyExistingClient("admin"));
+$("#historyExistingClientSelect").addEventListener("change",()=>applyExistingClient("history"));
 
 $$("[data-appointment-form-tab]").forEach(button=>button.addEventListener("click",()=>{const mode=button.dataset.appointmentFormTab;$$("[data-appointment-form-tab]").forEach(item=>item.classList.toggle("active",item===button));$("#adminAppointmentForm").classList.toggle("hidden",mode!=="future");$("#historicalAppointmentForm").classList.toggle("hidden",mode!=="history");$("#appointmentFormTitle").textContent=mode==="future"?"Nueva cita":"Registrar historial";populateAdminSelects();}));
 
@@ -1009,17 +1093,17 @@ $("#adminAppointmentForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const serviceId=Number($("#adminServiceSelect").value),staffId=Number($("#adminStaffSelect").value),date=$("#adminDate").value,time=$("#adminTime").value;
   const error=validateSlot(serviceId,staffId,date,time);if(error){showToast(error);return;}
-  const payload={client:$("#adminClientName").value.trim(),phone:$("#adminClientPhone").value.trim(),email:$("#adminClientEmail").value.trim().toLowerCase(),serviceId,staffId,date,time,notes:""};
+  const selectedClient=clientDirectory().find(c=>String(c.id??c.email)===$("#adminExistingClientSelect").value);const payload={client:$("#adminClientName").value.trim(),phone:$("#adminClientPhone").value.trim(),email:$("#adminClientEmail").value.trim().toLowerCase(),clientRecordId:$("#adminExistingClientSelect").dataset.mode==="existing"?(selectedClient?.id||null):null,serviceId,staffId,date,time,notes:""};
   try {
     if (cloudReady) { await Cloud.createAdminAppointment(payload); await reloadCloudState(false); }
     else {
-      const a={id:Date.now(),code:generateCode(),...payload,status:"Pendiente",source:"Negocio",reminderStatus:"Programado",emailStatus:"Pendiente"};
+      const localClient=upsertLocalClient(payload);const a={id:Date.now(),code:generateCode(),...payload,clientRecordId:localClient.id,status:"Pendiente",source:"Negocio",reminderStatus:"Programado",emailStatus:"Pendiente"};
       state.appointments.push(a);addAudit(`Cita ${a.code} creada manualmente`);saveState();
     }
-    e.target.reset();populateAdminSelects();renderAll();showToast("Cita agregada");
+    e.target.reset();populateAdminSelects();setClientMode("admin",clientDirectory().length?"existing":"new");renderAll();showToast("Cita agregada");
   } catch (error) { console.error(error); showToast(error.message || "No se pudo agregar la cita"); }
 });
-$("#historicalAppointmentForm").addEventListener("submit",async e=>{e.preventDefault();const payload={client:$("#historyClientName").value.trim(),phone:$("#historyClientPhone").value.trim(),email:$("#historyClientEmail").value.trim().toLowerCase(),serviceId:Number($("#historyServiceSelect").value),staffId:Number($("#historyStaffSelect").value),date:$("#historyDate").value,time:$("#historyTime").value,status:$("#historyStatus").value,source:$("#historySource").value,notes:$("#historyNotes").value.trim()};if(!payload.date||payload.date>zonedToday()){showToast("Selecciona una fecha pasada o de hoy");return;}try{if(cloudReady){await Cloud.createHistoricalAppointment(payload);await reloadCloudState(false);}else{const a={id:Date.now(),code:generateCode(),...payload,reminderStatus:payload.status==="Cancelada"?"Cancelado":"Enviado",emailStatus:"No configurado"};state.appointments.push(a);addAudit(`Registro histórico ${a.code} agregado`);saveState();renderAll();}e.target.reset();populateAdminSelects();showToast("Registro histórico guardado");}catch(error){console.error(error);showToast(error.message||"No se pudo guardar el historial");}});
+$("#historicalAppointmentForm").addEventListener("submit",async e=>{e.preventDefault();const selectedClient=clientDirectory().find(c=>String(c.id??c.email)===$("#historyExistingClientSelect").value);const payload={client:$("#historyClientName").value.trim(),phone:$("#historyClientPhone").value.trim(),email:$("#historyClientEmail").value.trim().toLowerCase(),clientRecordId:$("#historyExistingClientSelect").dataset.mode==="existing"?(selectedClient?.id||null):null,serviceId:Number($("#historyServiceSelect").value),staffId:Number($("#historyStaffSelect").value),date:$("#historyDate").value,time:$("#historyTime").value,status:$("#historyStatus").value,source:$("#historySource").value,notes:$("#historyNotes").value.trim()};if(!payload.date||payload.date>zonedToday()){showToast("Selecciona una fecha pasada o de hoy");return;}try{if(cloudReady){await Cloud.createHistoricalAppointment(payload);await reloadCloudState(false);}else{const localClient=upsertLocalClient(payload);const a={id:Date.now(),code:generateCode(),...payload,clientRecordId:localClient.id,reminderStatus:payload.status==="Cancelada"?"Cancelado":"Enviado",emailStatus:"No configurado"};state.appointments.push(a);addAudit(`Registro histórico ${a.code} agregado`);saveState();renderAll();}e.target.reset();populateAdminSelects();setClientMode("history",clientDirectory().length?"existing":"new");showToast("Registro histórico guardado");}catch(error){console.error(error);showToast(error.message||"No se pudo guardar el historial");}});
 $("#adminDate").addEventListener("change",()=>{const s=scheduleForDate($("#adminDate").value);if(s.open)$("#adminTime").value=s.start;});
 $("#appointmentsList").addEventListener("click",async e=>{
   const b=e.target.closest("[data-appt-action]");if(!b)return;const a=state.appointments.find(x=>x.id===Number(b.dataset.id));if(!a)return;

@@ -462,9 +462,17 @@
               <button type="button" class="form-mode-tab" data-appointment-form-tab="history">Registrar historial</button>
             </div>
             <form id="adminAppointmentForm" class="form-stack appointment-mode-panel">
-              <label>Cliente<input id="adminClientName" type="text" required /></label>
-              <label>Teléfono<input id="adminClientPhone" type="tel" required /></label>
-              <label>Correo<input id="adminClientEmail" type="email" required /></label>
+              <div class="client-mode-tabs">
+                <button type="button" class="client-mode-tab active" data-client-mode-scope="admin" data-client-mode="existing">Cliente registrado</button>
+                <button type="button" class="client-mode-tab" data-client-mode-scope="admin" data-client-mode="new">Nuevo cliente</button>
+              </div>
+              <div id="adminExistingClientBlock" class="client-existing-block">
+                <label>Seleccionar cliente<select id="adminExistingClientSelect"></select></label>
+                <p id="adminClientDirectoryHint" class="field-hint">Selecciona un cliente del CRM para completar sus datos automáticamente.</p>
+              </div>
+              <label>Cliente<input id="adminClientName" type="text" required readonly /></label>
+              <label>Teléfono<input id="adminClientPhone" type="tel" required readonly /></label>
+              <label>Correo<input id="adminClientEmail" type="email" required readonly /></label>
               <label>Servicio<select id="adminServiceSelect" required></select></label>
               <label>Profesional<select id="adminStaffSelect" required></select></label>
               <div class="form-grid">
@@ -475,9 +483,17 @@
             </form>
             <form id="historicalAppointmentForm" class="form-stack appointment-mode-panel hidden">
               <p class="notice neutral compact-notice">Usa esta opción para incorporar registros anteriores sin permitir reservas públicas en fechas pasadas.</p>
-              <label>Cliente<input id="historyClientName" type="text" required /></label>
-              <label>Teléfono<input id="historyClientPhone" type="tel" required /></label>
-              <label>Correo<input id="historyClientEmail" type="email" required /></label>
+              <div class="client-mode-tabs">
+                <button type="button" class="client-mode-tab active" data-client-mode-scope="history" data-client-mode="existing">Cliente registrado</button>
+                <button type="button" class="client-mode-tab" data-client-mode-scope="history" data-client-mode="new">Nuevo cliente</button>
+              </div>
+              <div id="historyExistingClientBlock" class="client-existing-block">
+                <label>Seleccionar cliente<select id="historyExistingClientSelect"></select></label>
+                <p id="historyClientDirectoryHint" class="field-hint">Selecciona un cliente del CRM para completar sus datos automáticamente.</p>
+              </div>
+              <label>Cliente<input id="historyClientName" type="text" required readonly /></label>
+              <label>Teléfono<input id="historyClientPhone" type="tel" required readonly /></label>
+              <label>Correo<input id="historyClientEmail" type="email" required readonly /></label>
               <label>Servicio<select id="historyServiceSelect" required></select></label>
               <label>Profesional<select id="historyStaffSelect" required></select></label>
               <div class="form-grid">
@@ -526,7 +542,7 @@
       <section id="clientsBusinessView" class="business-view hidden">
         <article class="panel">
           <div class="panel-header wrap">
-            <div><span class="eyebrow">CRM BÁSICO</span><h2>Clientes e historial</h2></div>
+            <div><span class="eyebrow">CRM BÁSICO</span><h2>Clientes registrados e historial</h2><p class="panel-subtitle">Incluye clientes con cuenta y clientes creados desde el negocio.</p></div>
             <div class="toolbar">
               <input id="clientSearch" type="search" placeholder="Buscar cliente..." />
               <button id="exportClientsBtn" class="btn btn-soft pro-action" type="button">Exportar CSV <span class="nav-pro-tag">PRO</span></button>
@@ -734,6 +750,7 @@
             <p class="notice">La API Key de Resend y el correo remitente se configuran como secretos de Supabase. No deben colocarse en GitHub ni en app.js.</p>
           </article>
         </div>
+
 
         <article id="brandingPanel" class="panel branding-panel">
           <div id="brandingPlanLock" class="feature-lock hidden">
