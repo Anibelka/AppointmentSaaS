@@ -5,6 +5,9 @@ const CLIENT_SESSION_KEY = "appointmentsaas_client_session_v4";
 const TIME_ZONE = "America/Santo_Domingo";
 const SLOT_INTERVAL_MINUTES = 30;
 const CANCEL_LIMIT_HOURS = 2;
+let cloudReady = false;
+let cloudSyncTimer = null;
+let cloudReloading = false;
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -126,7 +129,7 @@ function createInitialState() {
   };
 }
 
-let state = loadState();
+let state = createInitialState();
 let bookingStep = 1;
 let bookingDraft = {};
 let lastConfirmedAppointmentId = null;
@@ -139,17 +142,61 @@ function loadState() {
   } catch {}
   return createInitialState();
 }
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function scheduleCloudSync() {
+  if (!cloudReady || getBusinessSession()?.role !== "admin") return;
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(async () => {
+    try {
+      await Cloud.syncAdminState(state);
+    } catch (error) {
+      console.error(error);
+      showToast("No se pudo sincronizar un cambio con PostgreSQL");
+    }
+  }, 350);
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleCloudSync();
+}
 function getBusinessSession() {
+  if (cloudReady && ["admin","employee"].includes(Cloud.profile?.role)) {
+    return { role: Cloud.profile.role, name: Cloud.profile.name, staffId: Cloud.profile.staffId, email: Cloud.profile.email };
+  }
   try { return JSON.parse(localStorage.getItem(BUSINESS_SESSION_KEY)); } catch { return null; }
 }
-function setBusinessSession(v) { localStorage.setItem(BUSINESS_SESSION_KEY, JSON.stringify(v)); }
-function clearBusinessSession() { localStorage.removeItem(BUSINESS_SESSION_KEY); }
+function setBusinessSession(v) {
+  if (!cloudReady) localStorage.setItem(BUSINESS_SESSION_KEY, JSON.stringify(v));
+}
+function clearBusinessSession() {
+  if (!cloudReady) localStorage.removeItem(BUSINESS_SESSION_KEY);
+}
 function getClientSession() {
+  if (cloudReady && Cloud.profile?.role === "client") {
+    return { id: Cloud.profile.id, name: Cloud.profile.name, phone: Cloud.profile.phone, email: Cloud.profile.email };
+  }
   try { return JSON.parse(localStorage.getItem(CLIENT_SESSION_KEY)); } catch { return null; }
 }
-function setClientSession(v) { localStorage.setItem(CLIENT_SESSION_KEY, JSON.stringify(v)); }
-function clearClientSession() { localStorage.removeItem(CLIENT_SESSION_KEY); }
+function setClientSession(v) {
+  if (!cloudReady) localStorage.setItem(CLIENT_SESSION_KEY, JSON.stringify(v));
+}
+function clearClientSession() {
+  if (!cloudReady) localStorage.removeItem(CLIENT_SESSION_KEY);
+}
+async function reloadCloudState(showError = true) {
+  if (!cloudReady || cloudReloading) return;
+  cloudReloading = true;
+  try {
+    state = await Cloud.loadState(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    Cloud.subscribe(()=>reloadCloudState(false));
+    renderAll();
+  } catch (error) {
+    console.error(error);
+    if (showError) showToast("No se pudieron actualizar los datos de Supabase");
+  } finally {
+    cloudReloading = false;
+  }
+}
 
 function escapeHtml(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[c]));
@@ -183,7 +230,8 @@ function addAudit(action, actor = null) {
     actor: actor || business?.name || client?.name || "Sistema"
   });
   state.audit = state.audit.slice(0,80);
-  saveState();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (cloudReady && (business || client)) Cloud.logAudit(action).catch(console.warn);
 }
 function generateCode() {
   let code;
@@ -447,44 +495,20 @@ $$("[data-prev-step]").forEach(b => b.addEventListener("click", () => {
 }));
 
 async function sendRealEmail(appointment) {
-  const cfg = state.emailConfig;
-  if (!cfg.enabled || !cfg.serviceId || !cfg.templateId || !cfg.publicKey) {
-    return { sent:false, message:"Correo automático no configurado. La confirmación sí quedó guardada en el sistema." };
+  if (cloudReady) {
+    try {
+      await Cloud.sendAppointmentEmail(appointment.id);
+      appointment.emailStatus = "Enviado";
+      return { sent:true, message:`Correo real de confirmación enviado a ${appointment.email}.` };
+    } catch (error) {
+      console.error(error);
+      appointment.emailStatus = "Error";
+      return { sent:false, error:true, message:"La cita fue confirmada, pero el servicio de correo no pudo enviar el mensaje. Guarda el código de confirmación." };
+    }
   }
-  const service = getService(appointment.serviceId);
-  const staff = getStaff(appointment.staffId);
-  try {
-    const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({
-        service_id:cfg.serviceId,
-        template_id:cfg.templateId,
-        user_id:cfg.publicKey,
-        template_params:{
-          to_email:appointment.email,
-          to_name:appointment.client,
-          business_name:state.business.name,
-          appointment_code:appointment.code,
-          service_name:service?.name || "",
-          professional_name:staff?.name || "",
-          appointment_date:formatDate(appointment.date),
-          appointment_time:formatTime(appointment.time),
-          business_phone:state.business.phone,
-          business_address:state.business.address
-        }
-      })
-    });
-    if (!response.ok) throw new Error(await response.text());
-    appointment.emailStatus = "Enviado";
-    saveState();
-    return { sent:true, message:`Correo de confirmación enviado a ${appointment.email}.` };
-  } catch (error) {
-    appointment.emailStatus = "Error";
-    saveState();
-    return { sent:false, error:true, message:"La cita fue confirmada, pero el proveedor de correo no pudo enviar el mensaje." };
-  }
+  return { sent:false, message:"Modo local: la cita fue confirmada y el comprobante está disponible, pero el correo automático requiere Supabase + Resend." };
 }
+
 function showBookingSuccess(appointment) {
   lastConfirmedAppointmentId = appointment.id;
   $("#successCode").textContent = appointment.code;
@@ -505,20 +529,37 @@ $("#publicBookingForm").addEventListener("submit", async e => {
   e.preventDefault(); collectBookingInputs();
   const error = validateSlot(bookingDraft.serviceId,bookingDraft.staffId,bookingDraft.date,bookingDraft.time);
   if (error) { showToast(error); bookingStep=2; renderBookingStep(); return; }
-  const appointment = {
-    id:Date.now(), code:generateCode(), client:bookingDraft.client, phone:bookingDraft.phone,
-    email:bookingDraft.email, serviceId:bookingDraft.serviceId, staffId:bookingDraft.staffId,
-    date:bookingDraft.date, time:bookingDraft.time, status:"Confirmada", source:"Cliente",
-    notes:bookingDraft.notes, reminderStatus:"Programado", emailStatus:"Pendiente"
-  };
-  state.appointments.push(appointment);
-  addAudit(`Cita ${appointment.code} creada desde el portal`, appointment.client);
-  saveState();
-  renderAll();
-  showBookingSuccess(appointment);
-  const emailResult = await sendRealEmail(appointment);
-  $("#successEmailStatus").className = `email-status ${emailResult.sent?"success":emailResult.error?"error":""}`;
-  $("#successEmailStatus").textContent = emailResult.message;
+  if (cloudReady && !getClientSession()) {
+    showToast("Inicia sesión o crea una cuenta para confirmar la reserva");
+    openClientAuth("login");
+    return;
+  }
+  try {
+    let appointment;
+    if (cloudReady) {
+      appointment = await Cloud.bookAppointment(bookingDraft);
+      await reloadCloudState(false);
+      appointment = state.appointments.find(item => item.id === appointment.id) || appointment;
+    } else {
+      appointment = {
+        id:Date.now(), code:generateCode(), client:bookingDraft.client, phone:bookingDraft.phone,
+        email:bookingDraft.email, serviceId:bookingDraft.serviceId, staffId:bookingDraft.staffId,
+        date:bookingDraft.date, time:bookingDraft.time, status:"Confirmada", source:"Cliente",
+        notes:bookingDraft.notes, reminderStatus:"Programado", emailStatus:"Pendiente"
+      };
+      state.appointments.push(appointment);
+      addAudit(`Cita ${appointment.code} creada desde el portal`, appointment.client);
+      saveState(); renderAll();
+    }
+    showBookingSuccess(appointment);
+    const emailResult = await sendRealEmail(appointment);
+    $("#successEmailStatus").className = `email-status ${emailResult.sent?"success":emailResult.error?"error":""}`;
+    $("#successEmailStatus").textContent = emailResult.message;
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || "No se pudo confirmar la cita");
+    bookingStep=2; renderBookingStep();
+  }
 });
 
 function lastAppointment() {
@@ -565,27 +606,42 @@ $("#successAccountBtn").addEventListener("click", () => {
 
 function lookupCard(a) {
   const s=getService(a.serviceId),p=getStaff(a.staffId);
+  const serviceName = a.lookupServiceName || s?.name || "—";
+  const staffName = a.lookupStaffName || p?.name || "—";
   const canCancel=!["Cancelada","Completada","No asistió"].includes(a.status) && hoursUntilAppointment(a)>=CANCEL_LIMIT_HOURS;
   return `<div class="lookup-result"><div class="booking-summary">
     <div class="summary-item"><span>Estado</span><strong>${escapeHtml(a.status)}</strong></div>
-    <div class="summary-item"><span>Servicio</span><strong>${escapeHtml(s?.name||"—")}</strong></div>
-    <div class="summary-item"><span>Profesional</span><strong>${escapeHtml(p?.name||"—")}</strong></div>
+    <div class="summary-item"><span>Servicio</span><strong>${escapeHtml(serviceName)}</strong></div>
+    <div class="summary-item"><span>Profesional</span><strong>${escapeHtml(staffName)}</strong></div>
     <div class="summary-item"><span>Fecha y hora</span><strong>${formatDate(a.date)} · ${formatTime(a.time)}</strong></div>
   </div>
-  ${canCancel?`<button class="btn btn-soft btn-block" style="margin-top:14px;color:var(--danger)" data-public-cancel="${a.id}">Cancelar cita</button>`:""}
+  ${canCancel && (!cloudReady || getClientSession())?`<button class="btn btn-soft btn-block" style="margin-top:14px;color:var(--danger)" data-public-cancel="${a.id}">Cancelar cita</button>`:""}${cloudReady && canCancel && !getClientSession()?`<p class="notice">Inicia sesión en Mi cuenta para cancelar esta cita.</p>`:""}
   ${!canCancel && !["Cancelada","Completada","No asistió"].includes(a.status)?`<p class="notice">La cancelación en línea solo está disponible hasta ${CANCEL_LIMIT_HOURS} horas antes.</p>`:""}
   </div>`;
 }
-$("#lookupForm").addEventListener("submit", e => {
+$("#lookupForm").addEventListener("submit", async e => {
   e.preventDefault();
   const code=$("#lookupCode").value.trim().toUpperCase();
-  const a=state.appointments.find(x=>x.code.toUpperCase()===code);
-  $("#lookupResult").innerHTML=a?lookupCard(a):`<div class="empty-state">No encontramos una cita con ese código.</div>`;
+  try {
+    const a = cloudReady ? await Cloud.lookupByCode(code) : state.appointments.find(x=>x.code.toUpperCase()===code);
+    $("#lookupResult").innerHTML=a?lookupCard(a):`<div class="empty-state">No encontramos una cita con ese código.</div>`;
+  } catch (error) {
+    console.error(error); showToast("No se pudo consultar la cita");
+  }
 });
-$("#lookupResult").addEventListener("click", e => {
+$("#lookupResult").addEventListener("click", async e => {
   const b=e.target.closest("[data-public-cancel]"); if(!b)return;
   const a=state.appointments.find(x=>x.id===Number(b.dataset.publicCancel));
   if (!a || hoursUntilAppointment(a)<CANCEL_LIMIT_HOURS) { showToast("La cita ya no puede cancelarse en línea"); return; }
+  if (cloudReady) {
+    try {
+      await Cloud.cancelMyAppointment(a.id);
+      await reloadCloudState(false);
+      $("#lookupResult").innerHTML=lookupCard(state.appointments.find(x=>x.id===a.id) || {...a,status:"Cancelada"});
+      showToast("Cita cancelada");
+    } catch (error) { showToast(error.message || "No se pudo cancelar la cita"); }
+    return;
+  }
   a.status="Cancelada";a.reminderStatus="Cancelado";
   addAudit(`Cita ${a.code} cancelada por el cliente`,a.client);
   saveState();$("#lookupResult").innerHTML=lookupCard(a);renderAll();showToast("Cita cancelada");
@@ -607,29 +663,52 @@ function switchAuthTab(tab) {
   $("#clientRegisterForm").classList.toggle("hidden",tab!=="register");
 }
 $$("[data-auth-tab]").forEach(b=>b.addEventListener("click",()=>switchAuthTab(b.dataset.authTab)));
-$("#clientLoginForm").addEventListener("submit",e=>{
+$("#clientLoginForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const email=$("#clientLoginEmail").value.trim().toLowerCase();
   const password=$("#clientLoginPassword").value;
-  const account=state.clientAccounts.find(c=>c.email.toLowerCase()===email && c.password===password);
-  if(!account){showToast("Correo o contraseña incorrectos");return;}
-  setClientSession({id:account.id,name:account.name,phone:account.phone,email:account.email});
-  addAudit("Inicio de sesión del cliente",account.name);
-  closeClientAuth();renderAll();setPublicView("clientAccount");showToast("Sesión iniciada");
+  try {
+    let account;
+    if (cloudReady) {
+      account = await Cloud.signIn(email,password);
+      if (account.role !== "client") { await Cloud.signOut(); throw new Error("Esta cuenta pertenece al portal del negocio."); }
+      await reloadCloudState(false);
+    } else {
+      account=state.clientAccounts.find(c=>c.email.toLowerCase()===email && c.password===password);
+      if(!account) throw new Error("Correo o contraseña incorrectos");
+      setClientSession({id:account.id,name:account.name,phone:account.phone,email:account.email});
+      addAudit("Inicio de sesión del cliente",account.name);
+    }
+    closeClientAuth();renderAll();setPublicView("clientAccount");showToast("Sesión iniciada");
+  } catch (error) { console.error(error); showToast(error.message || "No se pudo iniciar sesión"); }
 });
-$("#clientRegisterForm").addEventListener("submit",e=>{
+$("#clientRegisterForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const email=$("#clientRegisterEmail").value.trim().toLowerCase();
-  if(state.clientAccounts.some(c=>c.email.toLowerCase()===email)){showToast("Ya existe una cuenta con ese correo");return;}
-  const account={id:Date.now(),name:$("#clientRegisterName").value.trim(),phone:$("#clientRegisterPhone").value.trim(),email,password:$("#clientRegisterPassword").value};
-  state.clientAccounts.push(account);saveState();
-  setClientSession({id:account.id,name:account.name,phone:account.phone,email:account.email});
-  addAudit("Cuenta de cliente creada",account.name);
-  closeClientAuth();renderAll();setPublicView("clientAccount");showToast("Cuenta creada");
+  const account={name:$("#clientRegisterName").value.trim(),phone:$("#clientRegisterPhone").value.trim(),email,password:$("#clientRegisterPassword").value};
+  try {
+    if (cloudReady) {
+      const result = await Cloud.signUpClient(account);
+      if (!result.sessionCreated) {
+        closeClientAuth();
+        showToast("Cuenta creada. Revisa tu correo para confirmar el registro.");
+        return;
+      }
+      await reloadCloudState(false);
+    } else {
+      if(state.clientAccounts.some(c=>c.email.toLowerCase()===email)) throw new Error("Ya existe una cuenta con ese correo");
+      account.id=Date.now();state.clientAccounts.push(account);saveState();
+      setClientSession({id:account.id,name:account.name,phone:account.phone,email:account.email});
+      addAudit("Cuenta de cliente creada",account.name);
+    }
+    closeClientAuth();renderAll();setPublicView("clientAccount");showToast("Cuenta creada");
+  } catch (error) { console.error(error); showToast(error.message || "No se pudo crear la cuenta"); }
 });
-$("#clientLogoutBtn").addEventListener("click",()=>{
+$("#clientLogoutBtn").addEventListener("click",async ()=>{
   const c=getClientSession();if(c)addAudit("Cierre de sesión del cliente",c.name);
-  clearClientSession();renderAll();setPublicView("home");
+  if (cloudReady) { await Cloud.signOut(); await reloadCloudState(false); }
+  else clearClientSession();
+  renderAll();setPublicView("home");
 });
 function clientAppointmentCard(a) {
   const s=getService(a.serviceId),p=getStaff(a.staffId);
@@ -660,6 +739,11 @@ $("#clientAccountPublicView").addEventListener("click",async e=>{
   if(cancel){
     const a=state.appointments.find(x=>x.id===Number(cancel.dataset.clientCancel));
     if(!a||hoursUntilAppointment(a)<CANCEL_LIMIT_HOURS){showToast("La cita ya no puede cancelarse en línea");return;}
+    if (cloudReady) {
+      try { await Cloud.cancelMyAppointment(a.id); await reloadCloudState(false); renderClientAccount(); showToast("Cita cancelada"); }
+      catch (error) { showToast(error.message || "No se pudo cancelar la cita"); }
+      return;
+    }
     a.status="Cancelada";a.reminderStatus="Cancelado";addAudit(`Cita ${a.code} cancelada desde Mi cuenta`,a.client);saveState();renderAll();renderClientAccount();showToast("Cita cancelada");
   }
 });
@@ -669,14 +753,23 @@ function closeBusinessLogin(){ $("#businessLoginModal").classList.add("hidden");
 $("#openBusinessLogin").addEventListener("click",openBusinessLogin);
 $("#footerBusinessLogin").addEventListener("click",openBusinessLogin);
 $$("[data-close-modal]").forEach(x=>x.addEventListener("click",closeBusinessLogin));
-$("#businessLoginForm").addEventListener("submit",e=>{
+$("#businessLoginForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const email=$("#businessEmail").value.trim().toLowerCase(),password=$("#businessPassword").value;
-  let session=null;
-  if(email==="demo@appointmentsaas.com"&&password==="Demo123!")session={role:"admin",name:"Anibelka Santana"};
-  if(email==="empleado@appointmentsaas.com"&&password==="Empleado123!")session={role:"employee",name:"Carlos Méndez",staffId:1};
-  if(!session){showToast("Credenciales incorrectas");return;}
-  setBusinessSession(session);addAudit("Inicio de sesión",session.name);closeBusinessLogin();showBusinessPortal();showToast("Sesión iniciada");
+  try {
+    let session;
+    if (cloudReady) {
+      session = await Cloud.signIn(email,password);
+      if (!["admin","employee"].includes(session.role)) { await Cloud.signOut(); throw new Error("Esta cuenta pertenece al portal del cliente."); }
+      await reloadCloudState(false);
+    } else {
+      if(email==="demo@appointmentsaas.com"&&password==="Demo123!")session={role:"admin",name:"Anibelka Santana"};
+      if(email==="empleado@appointmentsaas.com"&&password==="Empleado123!")session={role:"employee",name:"Carlos Méndez",staffId:1};
+      if(!session) throw new Error("Credenciales incorrectas");
+      setBusinessSession(session);addAudit("Inicio de sesión",session.name);
+    }
+    closeBusinessLogin();showBusinessPortal();showToast("Sesión iniciada");
+  } catch (error) { console.error(error); showToast(error.message || "No se pudo iniciar sesión"); }
 });
 function showBusinessPortal(){
   $("#publicPortal").classList.add("hidden");$("#businessPortal").classList.remove("hidden");currentBusinessView="dashboard";applyRoleUI();switchBusinessView("dashboard");renderAll();window.scrollTo(0,0);
@@ -684,8 +777,11 @@ function showBusinessPortal(){
 function showPublicPortal(){
   $("#businessPortal").classList.add("hidden");$("#publicPortal").classList.remove("hidden");setPublicView("home");
 }
-$("#exitBusinessPortal").addEventListener("click",()=>{
-  const s=getBusinessSession();if(s)addAudit("Cierre de sesión",s.name);clearBusinessSession();showPublicPortal();
+$("#exitBusinessPortal").addEventListener("click",async ()=>{
+  const s=getBusinessSession();if(s)addAudit("Cierre de sesión",s.name);
+  if (cloudReady) { await Cloud.signOut(); await reloadCloudState(false); }
+  else clearBusinessSession();
+  showPublicPortal();
 });
 function switchBusinessView(name){
   const titles={dashboard:"Resumen del negocio",appointments:"Gestión de citas",clients:"Clientes",services:"Servicios",staff:"Personal",analytics:"Analítica del negocio",notifications:"Recordatorios",subscription:"Suscripción",audit:"Bitácora",settings:"Configuración"};
@@ -814,28 +910,48 @@ function renderClosures(){
   $("#closuresList").innerHTML=state.business.closures.length?state.business.closures.sort((a,b)=>a.date.localeCompare(b.date)).map(c=>`<div class="closure-row"><div><strong>${formatDate(c.date)}</strong><span>${escapeHtml(c.reason)}</span></div><button class="mini-btn danger" data-remove-closure="${c.date}">Eliminar</button></div>`).join(""):`<div class="empty-state">No hay cierres especiales configurados.</div>`;
 }
 function renderEmailSettings(){
-  $("#emailEnabledSetting").checked=state.emailConfig.enabled;$("#emailServiceIdSetting").value=state.emailConfig.serviceId;$("#emailTemplateIdSetting").value=state.emailConfig.templateId;$("#emailPublicKeySetting").value=state.emailConfig.publicKey;
+  const status = $("#cloudEmailStatusText");
+  if (!status) return;
+  status.textContent = cloudReady
+    ? "Integración preparada. El envío depende de que RESEND_API_KEY y RESEND_FROM estén configurados en Supabase Edge Function Secrets."
+    : "Modo local activo: no se envían correos automáticos reales.";
+  const storage = $("#dataStorageDescription");
+  if (storage) storage.textContent = cloudReady
+    ? "PostgreSQL real en Supabase con autenticación y Row Level Security."
+    : "Modo local de respaldo mediante localStorage; configura Supabase para datos compartidos.";
 }
 function renderAll(){
   renderBusinessIdentity();renderPublicHome();renderPlanUI();applyRoleUI();populateAdminSelects();renderDashboard();renderAppointments();renderClients();renderServices();renderStaff();renderAnalytics();renderNotifications();renderAudit();renderWeeklySchedule();renderClosures();renderEmailSettings();renderClientHeader();
 }
 
-$("#adminAppointmentForm").addEventListener("submit",e=>{
+$("#adminAppointmentForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const serviceId=Number($("#adminServiceSelect").value),staffId=Number($("#adminStaffSelect").value),date=$("#adminDate").value,time=$("#adminTime").value;
   const error=validateSlot(serviceId,staffId,date,time);if(error){showToast(error);return;}
-  const a={id:Date.now(),code:generateCode(),client:$("#adminClientName").value.trim(),phone:$("#adminClientPhone").value.trim(),email:$("#adminClientEmail").value.trim().toLowerCase(),serviceId,staffId,date,time,status:"Pendiente",source:"Negocio",notes:"",reminderStatus:"Programado",emailStatus:"Pendiente"};
-  state.appointments.push(a);addAudit(`Cita ${a.code} creada manualmente`);saveState();e.target.reset();populateAdminSelects();renderAll();showToast("Cita agregada");
+  const payload={client:$("#adminClientName").value.trim(),phone:$("#adminClientPhone").value.trim(),email:$("#adminClientEmail").value.trim().toLowerCase(),serviceId,staffId,date,time,notes:""};
+  try {
+    if (cloudReady) { await Cloud.createAdminAppointment(payload); await reloadCloudState(false); }
+    else {
+      const a={id:Date.now(),code:generateCode(),...payload,status:"Pendiente",source:"Negocio",reminderStatus:"Programado",emailStatus:"Pendiente"};
+      state.appointments.push(a);addAudit(`Cita ${a.code} creada manualmente`);saveState();
+    }
+    e.target.reset();populateAdminSelects();renderAll();showToast("Cita agregada");
+  } catch (error) { console.error(error); showToast(error.message || "No se pudo agregar la cita"); }
 });
 $("#adminDate").addEventListener("change",()=>{const s=scheduleForDate($("#adminDate").value);if(s.open)$("#adminTime").value=s.start;});
-$("#appointmentsList").addEventListener("click",e=>{
+$("#appointmentsList").addEventListener("click",async e=>{
   const b=e.target.closest("[data-appt-action]");if(!b)return;const a=state.appointments.find(x=>x.id===Number(b.dataset.id));if(!a)return;
   if(getBusinessSession()?.role==="employee"&&a.staffId!==getBusinessSession().staffId){showToast("Sin permiso");return;}
-  if(b.dataset.apptAction==="confirm")a.status="Confirmada";
-  if(b.dataset.apptAction==="complete")a.status="Completada";
-  if(b.dataset.apptAction==="noshow")a.status="No asistió";
-  if(b.dataset.apptAction==="cancel"){a.status="Cancelada";a.reminderStatus="Cancelado";}
-  addAudit(`Cita ${a.code} actualizada a "${a.status}"`);saveState();renderAll();showToast("Estado actualizado");
+  const statuses={confirm:"Confirmada",complete:"Completada",noshow:"No asistió",cancel:"Cancelada"};
+  const nextStatus=statuses[b.dataset.apptAction];
+  try {
+    if (cloudReady) { await Cloud.setAppointmentStatus(a.id,nextStatus); await reloadCloudState(false); }
+    else {
+      a.status=nextStatus;if(nextStatus==="Cancelada")a.reminderStatus="Cancelado";
+      addAudit(`Cita ${a.code} actualizada a "${a.status}"`);saveState();renderAll();
+    }
+    showToast("Estado actualizado");
+  } catch (error) { console.error(error); showToast(error.message || "No se pudo actualizar la cita"); }
 });
 $("#appointmentSearch").addEventListener("input",renderAppointments);$("#appointmentStatusFilter").addEventListener("change",renderAppointments);$("#clientSearch").addEventListener("input",renderClients);
 $("#serviceForm").addEventListener("submit",e=>{e.preventDefault();const s={id:Date.now(),name:$("#serviceName").value.trim(),price:Number($("#servicePrice").value),duration:Number($("#serviceDuration").value),description:$("#serviceDescription").value.trim(),active:true};state.services.push(s);addAudit(`Servicio "${s.name}" agregado`);saveState();e.target.reset();renderAll();showToast("Servicio agregado");});
@@ -847,7 +963,6 @@ $("#settingImmediate").addEventListener("change",e=>{state.notificationSettings.
 $("#setting24h").addEventListener("change",e=>{state.notificationSettings.h24=e.target.checked;saveState();});
 $("#setting2h").addEventListener("change",e=>{state.notificationSettings.h2=e.target.checked;saveState();});
 $("#businessSettingsForm").addEventListener("submit",e=>{e.preventDefault();state.business.name=$("#businessNameSetting").value.trim();state.business.phone=$("#businessPhoneSetting").value.trim();state.business.address=$("#businessAddressSetting").value.trim();addAudit("Perfil del negocio actualizado");saveState();renderAll();showToast("Perfil actualizado");});
-$("#emailSettingsForm").addEventListener("submit",e=>{e.preventDefault();state.emailConfig.enabled=$("#emailEnabledSetting").checked;state.emailConfig.serviceId=$("#emailServiceIdSetting").value.trim();state.emailConfig.templateId=$("#emailTemplateIdSetting").value.trim();state.emailConfig.publicKey=$("#emailPublicKeySetting").value.trim();addAudit("Configuración de correo actualizada");saveState();renderAll();showToast("Configuración de correo guardada");});
 $("#weeklyScheduleEditor").addEventListener("change",e=>{
   const row = e.target.closest("[data-schedule-day]");
   if (!row) return;
@@ -874,8 +989,32 @@ $("#closureForm").addEventListener("submit",e=>{
   addAudit(`Cierre especial configurado para ${date}`);saveState();e.target.reset();renderAll();showToast("Cierre agregado");
 });
 $("#closuresList").addEventListener("click",e=>{const b=e.target.closest("[data-remove-closure]");if(!b)return;state.business.closures=state.business.closures.filter(c=>c.date!==b.dataset.removeClosure);addAudit(`Cierre especial eliminado: ${b.dataset.removeClosure}`);saveState();renderAll();});
-$("#clearAuditBtn").addEventListener("click",()=>{state.audit=[];saveState();renderAudit();});
-$("#resetDemoBtn").addEventListener("click",()=>{state=createInitialState();saveState();clearClientSession();renderAll();showToast("Demo restablecido");});
+$("#clearAuditBtn").addEventListener("click",()=>{
+  if (cloudReady) { showToast("La bitácora de producción no se elimina desde el navegador"); return; }
+  state.audit=[];saveState();renderAudit();
+});
+$("#resetDemoBtn").addEventListener("click",()=>{
+  if (cloudReady) { showToast("El restablecimiento de PostgreSQL se realiza con el script de seed"); return; }
+  state=createInitialState();saveState();clearClientSession();renderAll();showToast("Demo restablecido");
+});
 
-renderAll();
-if(getBusinessSession())showBusinessPortal();else setPublicView("home");
+async function bootstrapApplication(){
+  state=loadState();
+  cloudReady=await Cloud.init();
+  const mode=$("#connectionMode");
+  if (cloudReady) {
+    try {
+      state=await Cloud.loadState(state);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+      Cloud.subscribe(()=>reloadCloudState(false));
+      if(mode)mode.textContent="Supabase PostgreSQL conectado";
+    } catch (error) {
+      console.error(error);cloudReady=false;
+      if(mode)mode.textContent="Modo local de respaldo";
+      showToast("Supabase no respondió; se abrió el modo local");
+    }
+  } else if(mode) mode.textContent="Modo local de respaldo";
+  renderAll();
+  if(getBusinessSession())showBusinessPortal();else setPublicView("home");
+}
+bootstrapApplication();

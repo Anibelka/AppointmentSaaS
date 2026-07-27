@@ -1,0 +1,4 @@
+project_id = "appointmentsaas"
+
+[functions.send-appointment-email]
+verify_jwt = true

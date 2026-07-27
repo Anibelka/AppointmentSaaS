@@ -1,0 +1,14 @@
+{
+  "name": "appointmentsaas",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AppointmentSaaS - demo académico con Supabase PostgreSQL, Auth y correo transaccional.",
+  "scripts": {
+    "create-demo-users": "node scripts/create-demo-users.mjs",
+    "check": "node --check app.js && node --check cloud.js && node --check api/config.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  }
+}

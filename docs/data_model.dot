@@ -1,0 +1,26 @@
+digraph ER {
+  graph [rankdir=LR, bgcolor="white", margin=0.2, nodesep=0.45, ranksep=0.65];
+  node [shape=record, style="filled", fontname="Arial", fontsize=9, color="#b8c4d8", fillcolor="#f8faff", fontcolor="#16213b"];
+  edge [color="#5474a8", penwidth=1.2, arrowsize=0.7, fontname="Arial", fontsize=8];
+
+  businesses [label="{businesses|id PK\lslug\lname\ltimezone\lsubscription_plan\l}", fillcolor="#eaf1ff"];
+  profiles [label="{profiles|id PK/FK auth.users\lrole\lbusiness_id FK\lstaff_id FK\l}"];
+  services [label="{services|id PK\lbusiness_id FK\lname\lprice\lduration_minutes\l}"];
+  staff [label="{staff|id PK\lbusiness_id FK\luser_id FK\lname\lspecialty\l}"];
+  hours [label="{business_hours|business_id PK/FK\lday_of_week PK\lis_open\lopening_time\lclosing_time\l}"];
+  closures [label="{business_closures|id PK\lbusiness_id FK\lclosure_date\lreason\l}"];
+  appointments [label="{appointments|id PK\lbusiness_id FK\lclient_id FK\lservice_id FK\lstaff_id FK\lstarts_at / ends_at\lstatus\lconfirmation_code\l}", fillcolor="#e6f7ef"];
+  audit [label="{audit_logs|id PK\lbusiness_id FK\lactor_id FK\laction\lcreated_at\l}"];
+
+  businesses -> profiles [label="1:N"];
+  businesses -> services [label="1:N"];
+  businesses -> staff [label="1:N"];
+  businesses -> hours [label="1:7"];
+  businesses -> closures [label="1:N"];
+  businesses -> appointments [label="1:N"];
+  businesses -> audit [label="1:N"];
+  profiles -> appointments [label="cliente 1:N"];
+  profiles -> staff [label="0..1:1"];
+  services -> appointments [label="1:N"];
+  staff -> appointments [label="1:N"];
+}

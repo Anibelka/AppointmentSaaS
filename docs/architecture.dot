@@ -1,0 +1,29 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", margin=0.2, nodesep=0.45, ranksep=0.65];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=11, color="#b8c4d8", fillcolor="#f7f9fd", fontcolor="#16213b", margin="0.18,0.10"];
+  edge [color="#5474a8", penwidth=1.5, arrowsize=0.8, fontname="Arial", fontsize=9, fontcolor="#52627d"];
+
+  clients [label="Cliente final\nPortal de reservas", fillcolor="#eaf1ff", color="#6e9cf3"];
+  employee [label="Empleado\nAgenda asignada", fillcolor="#eaf1ff", color="#6e9cf3"];
+  admin [label="Administrador\nOperación y analítica", fillcolor="#eaf1ff", color="#6e9cf3"];
+  vercel [label="Frontend en Vercel\nHTML · CSS · JavaScript\nHTTPS", fillcolor="#172650", fontcolor="white", color="#172650"];
+  auth [label="Supabase Auth\nSesiones JWT"];
+  api [label="PostgREST + RPC\nReglas de negocio"];
+  db [label="PostgreSQL\nRLS · Integridad · Bitácora", fillcolor="#e6f7ef", color="#64ad8d"];
+  edgefn [label="Supabase Edge Function\nValidación de usuario y cita", fillcolor="#f2efff", color="#8777e6"];
+  resend [label="Resend\nCorreo transaccional", fillcolor="#fff4d8", color="#d1a13c"];
+
+  {rank=same; clients; employee; admin}
+  {rank=same; auth; api}
+
+  clients -> vercel [label="HTTPS"];
+  employee -> vercel [label="HTTPS"];
+  admin -> vercel [label="HTTPS"];
+  vercel -> auth [label="registro / login"];
+  vercel -> api [label="consultas / funciones"];
+  auth -> db [label="perfiles y roles"];
+  api -> db [label="SQL"];
+  vercel -> edgefn [label="JWT + appointment_id"];
+  edgefn -> db [label="consulta autorizada"];
+  edgefn -> resend [label="API privada"];
+}

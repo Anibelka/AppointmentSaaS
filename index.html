@@ -275,7 +275,7 @@
     <footer class="public-footer">
       <div>
         <strong>AppointmentSaaS</strong>
-        <span>Demo académico con datos simulados.</span>
+        <span>Demo académico · <span id="connectionMode">Comprobando conexión...</span></span>
       </div>
       <button id="footerBusinessLogin">Panel del negocio</button>
     </footer>
@@ -662,18 +662,13 @@
             </form>
           </article>
           <article class="panel">
-            <div class="panel-header"><div><span class="eyebrow">CORREO</span><h2>Confirmaciones automáticas</h2></div></div>
-            <form id="emailSettingsForm" class="form-stack">
-              <label class="toggle-row compact">
-                <span><strong>Habilitar correo real con EmailJS</strong><small>Requiere una cuenta y plantilla configurada.</small></span>
-                <input id="emailEnabledSetting" type="checkbox" />
-              </label>
-              <label>Service ID<input id="emailServiceIdSetting" type="text" placeholder="service_xxxxx" /></label>
-              <label>Template ID<input id="emailTemplateIdSetting" type="text" placeholder="template_xxxxx" /></label>
-              <label>Public Key<input id="emailPublicKeySetting" type="text" placeholder="Clave pública de EmailJS" /></label>
-              <button class="btn btn-primary" type="submit">Guardar configuración de correo</button>
-            </form>
-            <p class="notice">Sin estas credenciales, el demo mostrará la confirmación en pantalla y permitirá descargar el comprobante, pero no enviará un correo automático real.</p>
+            <div class="panel-header"><div><span class="eyebrow">CORREO TRANSACCIONAL</span><h2>Supabase + Resend</h2></div></div>
+            <div id="cloudEmailStatus" class="security-list">
+              <div><strong>Proveedor</strong><span>El correo se envía desde una Supabase Edge Function; la clave privada de Resend nunca se expone en el navegador.</span></div>
+              <div><strong>Estado</strong><span id="cloudEmailStatusText">Esperando configuración del entorno.</span></div>
+              <div><strong>Mensajes</strong><span>Confirmación de cita con código, servicio, profesional, fecha, hora, dirección y enlace de consulta.</span></div>
+            </div>
+            <p class="notice">La API Key de Resend y el correo remitente se configuran como secretos de Supabase. No deben colocarse en GitHub ni en app.js.</p>
           </article>
         </div>
 
@@ -707,7 +702,7 @@
             <div class="security-list">
               <div><strong>Roles</strong><span>Administrador, empleado y cliente.</span></div>
               <div><strong>Sesión</strong><span>Accesos separados para negocio, empleado y cliente.</span></div>
-              <div><strong>Datos</strong><span>Almacenamiento local del navegador para fines académicos.</span></div>
+              <div><strong>Datos</strong><span id="dataStorageDescription">PostgreSQL con RLS cuando Supabase está configurado; modo local solo como respaldo.</span></div>
               <div><strong>Producción</strong><span>La arquitectura propuesta contempla HTTPS, JWT, hashing y PostgreSQL privada.</span></div>
             </div>
           </article>
@@ -716,6 +711,8 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="cloud.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
