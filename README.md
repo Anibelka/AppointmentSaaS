@@ -149,3 +149,14 @@ Para una base existente ejecuta:
 ```text
 supabase/migrations/004_client_directory.sql
 ```
+
+
+## Teléfonos y duplicados
+
+Los teléfonos se muestran en formato `809-555-1234`. El directorio compara los números sin guiones, por lo que `8293698852` y `829-369-8852` corresponden al mismo cliente.
+
+En una base existente ejecuta:
+
+```text
+supabase/migrations/005_phone_normalization_and_client_dedup.sql
+```

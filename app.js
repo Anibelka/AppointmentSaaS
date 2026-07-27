@@ -210,6 +210,53 @@ async function reloadCloudState(showError = true) {
 function escapeHtml(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[c]));
 }
+function phoneDigits(value) {
+  let digits=String(value||"").replace(/\D/g,"");
+  if(digits.length===11&&digits.startsWith("1"))digits=digits.slice(1);
+  return digits.slice(0,10);
+}
+function formatPhone(value) {
+  const digits=phoneDigits(value);
+  if(digits.length<=3)return digits;
+  if(digits.length<=6)return `${digits.slice(0,3)}-${digits.slice(3)}`;
+  return `${digits.slice(0,3)}-${digits.slice(3,6)}-${digits.slice(6,10)}`;
+}
+function normalizeClientEmail(value) {
+  return String(value||"").trim().toLowerCase();
+}
+function sameClientIdentity(a,b) {
+  if(!a||!b)return false;
+  if(a.profileId&&b.profileId&&String(a.profileId)===String(b.profileId))return true;
+  const aEmail=normalizeClientEmail(a.email),bEmail=normalizeClientEmail(b.email);
+  if(aEmail&&bEmail&&aEmail===bEmail)return true;
+  const aPhone=phoneDigits(a.phone),bPhone=phoneDigits(b.phone);
+  if(aPhone.length===10&&bPhone.length===10&&aPhone===bPhone)return true;
+  return false;
+}
+function mergeClientData(target,source) {
+  const targetRegistered=Boolean(target.registered||target.profileId);
+  const sourceRegistered=Boolean(source.registered||source.profileId);
+  const preferred=sourceRegistered&&!targetRegistered?source:target;
+  const secondary=preferred===target?source:target;
+  return {
+    id:preferred.id??secondary.id??null,
+    profileId:preferred.profileId??secondary.profileId??null,
+    name:preferred.name||secondary.name||"",
+    phone:formatPhone(preferred.phone||secondary.phone||""),
+    email:normalizeClientEmail(preferred.email||secondary.email||""),
+    registered:targetRegistered||sourceRegistered,
+    active:target.active!==false||source.active!==false
+  };
+}
+function attachPhoneMask(input) {
+  if(!input)return;
+  input.addEventListener("input",()=>{
+    const atEnd=input.selectionStart===input.value.length;
+    input.value=formatPhone(input.value);
+    if(atEnd&&input.setSelectionRange)input.setSelectionRange(input.value.length,input.value.length);
+  });
+  input.addEventListener("blur",()=>{input.value=formatPhone(input.value);});
+}
 function currency(v) {
   return new Intl.NumberFormat("es-DO", { style:"currency", currency:"DOP", maximumFractionDigits:0 }).format(v).replace("DOP","RD$");
 }
@@ -376,11 +423,11 @@ $$("[data-public-view]").forEach(b => b.addEventListener("click", () => setPubli
 
 function renderBusinessIdentity() {
   $$('[data-business-name]').forEach(el => el.textContent = state.business.name);
-  $("#publicBusinessPhone").textContent = state.business.phone;
+  $("#publicBusinessPhone").textContent = formatPhone(state.business.phone);
   $("#publicBusinessAddress").textContent = state.business.address;
   $("#publicBusinessHours").textContent = publicScheduleSummary();
   $("#businessNameSetting").value = state.business.name;
-  $("#businessPhoneSetting").value = state.business.phone;
+  $("#businessPhoneSetting").value = formatPhone(state.business.phone);
   $("#businessAddressSetting").value = state.business.address;
   if($("#brandLogoTextSetting"))$("#brandLogoTextSetting").value=state.business.brandLogoText||"BC";
   if($("#brandColorSetting"))$("#brandColorSetting").value=normalizeHexColor(state.business.brandColor);
@@ -499,7 +546,7 @@ function collectBookingInputs() {
   bookingDraft.staffId = Number($("#bookingStaff")?.value || bookingDraft.staffId);
   bookingDraft.date = $("#bookingDate")?.value || bookingDraft.date;
   bookingDraft.client = $("#bookingClientName")?.value.trim() || bookingDraft.client;
-  bookingDraft.phone = $("#bookingClientPhone")?.value.trim() || bookingDraft.phone;
+  bookingDraft.phone = formatPhone($("#bookingClientPhone")?.value || bookingDraft.phone);
   bookingDraft.email = $("#bookingClientEmail")?.value.trim().toLowerCase() || bookingDraft.email;
   bookingDraft.notes = $("#bookingNotes")?.value.trim() || bookingDraft.notes;
 }
@@ -741,7 +788,7 @@ $("#clientLoginForm").addEventListener("submit",async e=>{
 $("#clientRegisterForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const email=$("#clientRegisterEmail").value.trim().toLowerCase();
-  const account={name:$("#clientRegisterName").value.trim(),phone:$("#clientRegisterPhone").value.trim(),email,password:$("#clientRegisterPassword").value};
+  const account={name:$("#clientRegisterName").value.trim(),phone:formatPhone($("#clientRegisterPhone").value),email,password:$("#clientRegisterPassword").value};
   try {
     if (cloudReady) {
       const result = await Cloud.signUpClient(account);
@@ -780,7 +827,7 @@ function renderClientAccount() {
   if(!c){openClientAuth("login");setPublicView("home");return;}
   $("#clientWelcomeTitle").textContent=`Hola, ${c.name.split(" ")[0]}`;
   $("#clientProfileAvatar").textContent=c.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
-  $("#clientProfileName").textContent=c.name;$("#clientProfileEmail").textContent=c.email;$("#clientProfilePhone").textContent=c.phone;
+  $("#clientProfileName").textContent=c.name;$("#clientProfileEmail").textContent=c.email;$("#clientProfilePhone").textContent=formatPhone(c.phone);
   const list=sortAppointments(state.appointments.filter(a=>a.email.toLowerCase()===c.email.toLowerCase()));
   const upcoming=list.filter(a=>["Pendiente","Confirmada"].includes(a.status) && appointmentInstant(a)>new Date());
   const history=list.filter(a=>!upcoming.includes(a)).reverse();
@@ -857,42 +904,80 @@ function visibleAppointments(includeCancelled=true){
   return includeCancelled?list:list.filter(a=>a.status!=="Cancelada");
 }
 function clientDirectory(){
-  const map=new Map();
-  (state.clients||[]).filter(c=>c.active!==false).forEach(c=>{
-    const key=(c.email||c.phone||String(c.id)).toLowerCase();
-    map.set(key,{id:c.id||null,profileId:c.profileId||null,name:c.name,phone:c.phone||"",email:c.email||"",registered:Boolean(c.registered||c.profileId),active:true});
-  });
-  (state.clientAccounts||[]).forEach(c=>{
-    const key=(c.email||c.phone||String(c.id)).toLowerCase();
-    if(!map.has(key))map.set(key,{id:c.id||null,profileId:c.id||null,name:c.name,phone:c.phone||"",email:c.email||"",registered:true,active:true});
-  });
-  state.appointments.forEach(a=>{
-    const key=(a.email||a.phone||String(a.clientRecordId||a.id)).toLowerCase();
-    if(!map.has(key))map.set(key,{id:a.clientRecordId||null,profileId:a.clientId||null,name:a.client,phone:a.phone||"",email:a.email||"",registered:Boolean(a.clientId),active:true});
-  });
-  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,"es"));
+  const merged=[];
+  const addCandidate=c=>{
+    if(!c||c.active===false)return;
+    const candidate={
+      id:c.id??null,
+      profileId:c.profileId??c.clientId??null,
+      name:String(c.name||c.client||"").trim(),
+      phone:formatPhone(c.phone||""),
+      email:normalizeClientEmail(c.email||""),
+      registered:Boolean(c.registered||c.profileId||c.clientId),
+      active:true
+    };
+    if(!candidate.name&&!candidate.phone&&!candidate.email)return;
+    const index=merged.findIndex(item=>sameClientIdentity(item,candidate));
+    if(index>=0)merged[index]=mergeClientData(merged[index],candidate);
+    else merged.push(candidate);
+  };
+  (state.clients||[]).forEach(addCandidate);
+  (state.clientAccounts||[]).forEach(c=>addCandidate({...c,profileId:c.id,registered:true}));
+  state.appointments.forEach(a=>addCandidate({
+    id:a.clientRecordId||null,
+    profileId:a.clientId||null,
+    name:a.client,
+    phone:a.phone,
+    email:a.email,
+    registered:Boolean(a.clientId)
+  }));
+  return merged.sort((a,b)=>a.name.localeCompare(b.name,"es"));
 }
 function appointmentClients(list=visibleAppointments()){
-  const map=new Map();
-  clientDirectory().forEach(c=>{
-    const key=(c.email||c.phone||String(c.id)).toLowerCase();
-    map.set(key,{...c,visits:0,revenue:0,lastDate:""});
-  });
+  const clients=clientDirectory().map(c=>({...c,visits:0,revenue:0,lastDate:""}));
   list.forEach(a=>{
-    const key=(a.email||a.phone||String(a.clientRecordId||a.id)).toLowerCase();
-    if(!map.has(key))map.set(key,{id:a.clientRecordId||null,profileId:a.clientId||null,name:a.client,phone:a.phone,email:a.email,registered:Boolean(a.clientId),visits:0,revenue:0,lastDate:""});
-    const c=map.get(key);
-    if(!["Cancelada","No asistió"].includes(a.status)){c.visits++;c.revenue+=priceOf(a);}
-    if(!c.lastDate||a.date>c.lastDate)c.lastDate=a.date;
+    const candidate={
+      id:a.clientRecordId||null,
+      profileId:a.clientId||null,
+      name:a.client,
+      phone:formatPhone(a.phone),
+      email:normalizeClientEmail(a.email),
+      registered:Boolean(a.clientId),
+      active:true
+    };
+    let client=clients.find(c=>sameClientIdentity(c,candidate));
+    if(!client){
+      client={...candidate,visits:0,revenue:0,lastDate:""};
+      clients.push(client);
+    }else{
+      const visits=client.visits,revenue=client.revenue,lastDate=client.lastDate;
+      Object.assign(client,mergeClientData(client,candidate),{visits,revenue,lastDate});
+    }
+    if(!["Cancelada","No asistió"].includes(a.status)){client.visits++;client.revenue+=priceOf(a);}
+    if(!client.lastDate||a.date>client.lastDate)client.lastDate=a.date;
   });
-  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,"es"));
+  return clients.sort((a,b)=>a.name.localeCompare(b.name,"es"));
 }
 function upsertLocalClient(payload){
   state.clients=state.clients||[];
-  const email=payload.email.toLowerCase();
-  let client=state.clients.find(c=>(c.email||"").toLowerCase()===email);
-  if(client){client.name=payload.client;client.phone=payload.phone;client.active=true;}
-  else{client={id:Date.now(),profileId:null,name:payload.client,phone:payload.phone,email,registered:false,active:true};state.clients.push(client);}
+  const candidate={
+    id:null,
+    profileId:null,
+    name:payload.client,
+    phone:formatPhone(payload.phone),
+    email:normalizeClientEmail(payload.email),
+    registered:false,
+    active:true
+  };
+  let client=state.clients.find(c=>sameClientIdentity(c,candidate));
+  if(client){
+    Object.assign(client,mergeClientData(client,candidate),{active:true});
+  }else{
+    client={...candidate,id:Date.now()};
+    state.clients.push(client);
+  }
+  payload.phone=client.phone;
+  payload.email=client.email;
   return client;
 }
 function serviceStats(list=state.appointments){
@@ -953,7 +1038,7 @@ function clientFormConfig(scope){
 function fillClientFields(scope,client){
   const c=clientFormConfig(scope);
   $(c.name).value=client?.name||"";
-  $(c.phone).value=client?.phone||"";
+  $(c.phone).value=formatPhone(client?.phone||"");
   $(c.email).value=client?.email||"";
 }
 function applyExistingClient(scope){
@@ -980,7 +1065,7 @@ function setClientMode(scope,mode,keepSelection=false){
 }
 function populateClientSelectors(){
   const directory=clientDirectory();
-  const options=directory.map(c=>`<option value="${escapeHtml(String(c.id??c.email))}">${escapeHtml(c.name)} · ${escapeHtml(c.phone||c.email)}${c.registered?" · Con cuenta":""}</option>`).join("");
+  const options=directory.map(c=>`<option value="${escapeHtml(String(c.id??c.email))}">${escapeHtml(c.name)} · ${escapeHtml(formatPhone(c.phone)||c.email)}${c.registered?" · Con cuenta":""}</option>`).join("");
   ["admin","history"].forEach(scope=>{
     const c=clientFormConfig(scope),previous=$(c.select).value;
     $(c.select).innerHTML=options||'<option value="">No hay clientes registrados</option>';
@@ -1032,8 +1117,8 @@ function renderClients(){
   const headers=employee?"<tr><th>Cliente</th><th>Contacto</th><th>Citas</th><th>Última cita</th></tr>":"<tr><th>Cliente</th><th>Contacto</th><th>Tipo</th><th>Citas</th><th>Ingresos</th><th>Última cita</th></tr>";
   const badge=c=>c.registered?'<span class="client-type-badge account">Con cuenta</span>':'<span class="client-type-badge crm">CRM</span>';
   const rows=list.map(c=>employee
-    ?`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${c.lastDate?formatDate(c.lastDate):"Sin citas"}</td></tr>`
-    :`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${badge(c)}</td><td>${c.visits}</td><td>${currency(c.revenue)}</td><td>${c.lastDate?formatDate(c.lastDate):"Sin citas"}</td></tr>`
+    ?`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(formatPhone(c.phone))}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${c.lastDate?formatDate(c.lastDate):"Sin citas"}</td></tr>`
+    :`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(formatPhone(c.phone))}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${badge(c)}</td><td>${c.visits}</td><td>${currency(c.revenue)}</td><td>${c.lastDate?formatDate(c.lastDate):"Sin citas"}</td></tr>`
   ).join("");
   $("#clientsTable").innerHTML=`<table><thead>${headers}</thead><tbody>${rows||`<tr><td colspan="${employee?4:6}">Sin resultados.</td></tr>`}</tbody></table>`;
 }
@@ -1083,6 +1168,8 @@ function renderAll(){
   renderBusinessIdentity();renderPublicHome();renderPlanUI();applyRoleUI();populateAdminSelects();renderDashboard();renderAppointments();renderClients();renderServices();renderStaff();renderAnalytics();renderNotifications();renderAudit();renderWeeklySchedule();renderClosures();renderEmailSettings();renderClientHeader();
 }
 
+["bookingClientPhone","clientRegisterPhone","adminClientPhone","historyClientPhone","businessPhoneSetting"].forEach(id=>attachPhoneMask($("#"+id)));
+
 $$("[data-client-mode-scope]").forEach(button=>button.addEventListener("click",()=>setClientMode(button.dataset.clientModeScope,button.dataset.clientMode)));
 $("#adminExistingClientSelect").addEventListener("change",()=>applyExistingClient("admin"));
 $("#historyExistingClientSelect").addEventListener("change",()=>applyExistingClient("history"));
@@ -1093,7 +1180,7 @@ $("#adminAppointmentForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const serviceId=Number($("#adminServiceSelect").value),staffId=Number($("#adminStaffSelect").value),date=$("#adminDate").value,time=$("#adminTime").value;
   const error=validateSlot(serviceId,staffId,date,time);if(error){showToast(error);return;}
-  const selectedClient=clientDirectory().find(c=>String(c.id??c.email)===$("#adminExistingClientSelect").value);const payload={client:$("#adminClientName").value.trim(),phone:$("#adminClientPhone").value.trim(),email:$("#adminClientEmail").value.trim().toLowerCase(),clientRecordId:$("#adminExistingClientSelect").dataset.mode==="existing"?(selectedClient?.id||null):null,serviceId,staffId,date,time,notes:""};
+  const selectedClient=clientDirectory().find(c=>String(c.id??c.email)===$("#adminExistingClientSelect").value);const payload={client:$("#adminClientName").value.trim(),phone:formatPhone($("#adminClientPhone").value),email:normalizeClientEmail($("#adminClientEmail").value),clientRecordId:$("#adminExistingClientSelect").dataset.mode==="existing"?(selectedClient?.id||null):null,serviceId,staffId,date,time,notes:""};
   try {
     if (cloudReady) { await Cloud.createAdminAppointment(payload); await reloadCloudState(false); }
     else {
@@ -1103,7 +1190,7 @@ $("#adminAppointmentForm").addEventListener("submit",async e=>{
     e.target.reset();populateAdminSelects();setClientMode("admin",clientDirectory().length?"existing":"new");renderAll();showToast("Cita agregada");
   } catch (error) { console.error(error); showToast(error.message || "No se pudo agregar la cita"); }
 });
-$("#historicalAppointmentForm").addEventListener("submit",async e=>{e.preventDefault();const selectedClient=clientDirectory().find(c=>String(c.id??c.email)===$("#historyExistingClientSelect").value);const payload={client:$("#historyClientName").value.trim(),phone:$("#historyClientPhone").value.trim(),email:$("#historyClientEmail").value.trim().toLowerCase(),clientRecordId:$("#historyExistingClientSelect").dataset.mode==="existing"?(selectedClient?.id||null):null,serviceId:Number($("#historyServiceSelect").value),staffId:Number($("#historyStaffSelect").value),date:$("#historyDate").value,time:$("#historyTime").value,status:$("#historyStatus").value,source:$("#historySource").value,notes:$("#historyNotes").value.trim()};if(!payload.date||payload.date>zonedToday()){showToast("Selecciona una fecha pasada o de hoy");return;}try{if(cloudReady){await Cloud.createHistoricalAppointment(payload);await reloadCloudState(false);}else{const localClient=upsertLocalClient(payload);const a={id:Date.now(),code:generateCode(),...payload,clientRecordId:localClient.id,reminderStatus:payload.status==="Cancelada"?"Cancelado":"Enviado",emailStatus:"No configurado"};state.appointments.push(a);addAudit(`Registro histórico ${a.code} agregado`);saveState();renderAll();}e.target.reset();populateAdminSelects();setClientMode("history",clientDirectory().length?"existing":"new");showToast("Registro histórico guardado");}catch(error){console.error(error);showToast(error.message||"No se pudo guardar el historial");}});
+$("#historicalAppointmentForm").addEventListener("submit",async e=>{e.preventDefault();const selectedClient=clientDirectory().find(c=>String(c.id??c.email)===$("#historyExistingClientSelect").value);const payload={client:$("#historyClientName").value.trim(),phone:formatPhone($("#historyClientPhone").value),email:normalizeClientEmail($("#historyClientEmail").value),clientRecordId:$("#historyExistingClientSelect").dataset.mode==="existing"?(selectedClient?.id||null):null,serviceId:Number($("#historyServiceSelect").value),staffId:Number($("#historyStaffSelect").value),date:$("#historyDate").value,time:$("#historyTime").value,status:$("#historyStatus").value,source:$("#historySource").value,notes:$("#historyNotes").value.trim()};if(!payload.date||payload.date>zonedToday()){showToast("Selecciona una fecha pasada o de hoy");return;}try{if(cloudReady){await Cloud.createHistoricalAppointment(payload);await reloadCloudState(false);}else{const localClient=upsertLocalClient(payload);const a={id:Date.now(),code:generateCode(),...payload,clientRecordId:localClient.id,reminderStatus:payload.status==="Cancelada"?"Cancelado":"Enviado",emailStatus:"No configurado"};state.appointments.push(a);addAudit(`Registro histórico ${a.code} agregado`);saveState();renderAll();}e.target.reset();populateAdminSelects();setClientMode("history",clientDirectory().length?"existing":"new");showToast("Registro histórico guardado");}catch(error){console.error(error);showToast(error.message||"No se pudo guardar el historial");}});
 $("#adminDate").addEventListener("change",()=>{const s=scheduleForDate($("#adminDate").value);if(s.open)$("#adminTime").value=s.start;});
 $("#appointmentsList").addEventListener("click",async e=>{
   const b=e.target.closest("[data-appt-action]");if(!b)return;const a=state.appointments.find(x=>x.id===Number(b.dataset.id));if(!a)return;
@@ -1133,7 +1220,7 @@ $("#exportClientsBtn").addEventListener("click",exportClientsCsv);
 $("#exportAnalyticsBtn").addEventListener("click",exportAnalyticsCsv);
 $("#brandingSettingsForm").addEventListener("submit",e=>{e.preventDefault();if(!requirePro("La personalización del portal"))return;state.business.brandLogoText=$("#brandLogoTextSetting").value.trim().slice(0,3).toUpperCase()||"BC";state.business.brandColor=normalizeHexColor($("#brandColorSetting").value);state.business.bookingMessage=$("#bookingMessageSetting").value.trim()||"Reserva tu cita sin llamadas ni mensajes.";addAudit("Personalización del portal actualizada");saveState();renderAll();showToast("Personalización guardada");});
 $("#brandColorSetting").addEventListener("input",e=>{$("#brandingPreview").style.background=e.target.value;});
-$("#businessSettingsForm").addEventListener("submit",e=>{e.preventDefault();state.business.name=$("#businessNameSetting").value.trim();state.business.phone=$("#businessPhoneSetting").value.trim();state.business.address=$("#businessAddressSetting").value.trim();addAudit("Perfil del negocio actualizado");saveState();renderAll();showToast("Perfil actualizado");});
+$("#businessSettingsForm").addEventListener("submit",e=>{e.preventDefault();state.business.name=$("#businessNameSetting").value.trim();state.business.phone=formatPhone($("#businessPhoneSetting").value);state.business.address=$("#businessAddressSetting").value.trim();addAudit("Perfil del negocio actualizado");saveState();renderAll();showToast("Perfil actualizado");});
 $("#weeklyScheduleEditor").addEventListener("change",e=>{
   const row = e.target.closest("[data-schedule-day]");
   if (!row) return;

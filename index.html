@@ -146,7 +146,7 @@
                     </label>
                     <label>
                       Teléfono
-                      <input id="bookingClientPhone" type="tel" placeholder="809-000-0000" required />
+                      <input id="bookingClientPhone" type="tel" maxlength="14" inputmode="numeric" placeholder="809-000-0000" required />
                     </label>
                     <label>
                       Correo electrónico
@@ -302,7 +302,7 @@
 
       <form id="clientRegisterForm" class="form-stack auth-panel hidden">
         <label>Nombre completo<input id="clientRegisterName" type="text" required /></label>
-        <label>Teléfono<input id="clientRegisterPhone" type="tel" placeholder="809-000-0000" required /></label>
+        <label>Teléfono<input id="clientRegisterPhone" type="tel" maxlength="14" inputmode="numeric" placeholder="809-000-0000" required /></label>
         <label>Correo<input id="clientRegisterEmail" type="email" required /></label>
         <label>Contraseña<input id="clientRegisterPassword" type="password" minlength="6" required /></label>
         <button class="btn btn-primary btn-block" type="submit">Crear cuenta</button>
@@ -471,7 +471,7 @@
                 <p id="adminClientDirectoryHint" class="field-hint">Selecciona un cliente del CRM para completar sus datos automáticamente.</p>
               </div>
               <label>Cliente<input id="adminClientName" type="text" required readonly /></label>
-              <label>Teléfono<input id="adminClientPhone" type="tel" required readonly /></label>
+              <label>Teléfono<input id="adminClientPhone" type="tel" maxlength="14" inputmode="numeric" required readonly /></label>
               <label>Correo<input id="adminClientEmail" type="email" required readonly /></label>
               <label>Servicio<select id="adminServiceSelect" required></select></label>
               <label>Profesional<select id="adminStaffSelect" required></select></label>
@@ -492,7 +492,7 @@
                 <p id="historyClientDirectoryHint" class="field-hint">Selecciona un cliente del CRM para completar sus datos automáticamente.</p>
               </div>
               <label>Cliente<input id="historyClientName" type="text" required readonly /></label>
-              <label>Teléfono<input id="historyClientPhone" type="tel" required readonly /></label>
+              <label>Teléfono<input id="historyClientPhone" type="tel" maxlength="14" inputmode="numeric" required readonly /></label>
               <label>Correo<input id="historyClientEmail" type="email" required readonly /></label>
               <label>Servicio<select id="historyServiceSelect" required></select></label>
               <label>Profesional<select id="historyStaffSelect" required></select></label>
@@ -734,7 +734,7 @@
             <div class="panel-header"><div><span class="eyebrow">NEGOCIO</span><h2>Perfil público</h2></div></div>
             <form id="businessSettingsForm" class="form-stack">
               <label>Nombre del negocio<input id="businessNameSetting" type="text" value="Barbería Caribe" /></label>
-              <label>Teléfono<input id="businessPhoneSetting" type="tel" value="809-555-0101" /></label>
+              <label>Teléfono<input id="businessPhoneSetting" type="tel" maxlength="14" inputmode="numeric" value="809-555-0101" /></label>
               <label>Dirección<input id="businessAddressSetting" type="text" value="Av. Winston Churchill, Santo Domingo" /></label>
               <label>Zona horaria<input type="text" value="America/Santo_Domingo (UTC-4)" disabled /></label>
               <button class="btn btn-primary" type="submit">Guardar perfil</button>
