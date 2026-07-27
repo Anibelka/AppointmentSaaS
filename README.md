@@ -134,3 +134,13 @@ Cuando Supabase no está configurado, los datos se guardan solamente en el naveg
 - Anibelka Santana
 
 Proyecto Integrador II - UNIBE, 2026.
+
+
+## Actualización funcional consolidada
+
+- Agenda ordenada: próximas, vencidas pendientes e historial.
+- Registro histórico desde la interfaz.
+- Plan Básico: hasta 4 servicios y 2 profesionales activos.
+- Plan Pro: correos, recordatorios, analítica avanzada, CSV, bitácora y personalización.
+- Ejecuta `supabase/migrations/003_final_product_improvements.sql` en bases existentes.
+- Despliega `send-appointment-email` y `process-appointment-reminders` para correo real.

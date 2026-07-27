@@ -1,7 +1,8 @@
 -- AppointmentSaaS - PostgreSQL schema, business rules, RLS and demo seed
 -- Execute this file once in Supabase SQL Editor.
 
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 create extension if not exists btree_gist;
 
 -- ---------------------------------------------------------------------------
@@ -20,6 +21,9 @@ create table if not exists public.businesses (
   notification_immediate boolean not null default true,
   notification_24h boolean not null default true,
   notification_2h boolean not null default true,
+  brand_primary_color text not null default '#2f6fe4',
+  brand_logo_text text not null default 'BC',
+  booking_message text not null default 'Reserva tu cita sin llamadas ni mensajes.',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -104,6 +108,9 @@ create table if not exists public.appointments (
   reminder_status text not null default 'Programado' check (reminder_status in ('Programado','Enviado','Cancelado','Error')),
   email_status text not null default 'Pendiente' check (email_status in ('Pendiente','Enviado','Error','No configurado')),
   email_sent_at timestamptz,
+  reminder_24h_sent_at timestamptz,
+  reminder_2h_sent_at timestamptz,
+  cancellation_email_sent_at timestamptz,
   confirmation_code text not null unique,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -378,7 +385,7 @@ create or replace function public.book_appointment(
 returns public.appointments
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public, extensions
 as $$
 declare
   v_business public.businesses%rowtype;
@@ -450,7 +457,7 @@ begin
     raise exception 'El horario ya no está disponible.';
   end if;
 
-  v_code := 'APT-' || upper(substr(encode(gen_random_bytes(8), 'hex'), 1, 10));
+  v_code := 'APT-' || upper(substr(encode(extensions.gen_random_bytes(8), 'hex'), 1, 10));
 
   insert into public.appointments (
     business_id, client_id, client_name, client_phone, client_email,
@@ -483,7 +490,7 @@ create or replace function public.admin_create_appointment(
 returns public.appointments
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public, extensions
 as $$
 declare
   v_business public.businesses%rowtype;
@@ -526,7 +533,7 @@ begin
       and tstzrange(a.starts_at,a.ends_at,'[)') && tstzrange(p_starts_at,v_ends_at,'[)')
   ) then raise exception 'El profesional ya tiene una cita en ese horario.'; end if;
 
-  v_code := 'APT-' || upper(substr(encode(gen_random_bytes(8), 'hex'), 1, 10));
+  v_code := 'APT-' || upper(substr(encode(extensions.gen_random_bytes(8), 'hex'), 1, 10));
   insert into public.appointments (
     business_id, client_id, client_name, client_phone, client_email,
     service_id, staff_id, starts_at, ends_at, local_date, local_time,
@@ -543,6 +550,18 @@ exception
   when exclusion_violation then raise exception 'El horario acaba de ser ocupado.';
 end;
 $$;
+
+create or replace function public.admin_create_historical_appointment(p_service_id bigint,p_staff_id bigint,p_starts_at timestamptz,p_client_name text,p_client_phone text,p_client_email text,p_status text,p_source text,p_notes text default '') returns public.appointments language plpgsql security definer set search_path = pg_catalog, public, extensions as $$
+declare v_business public.businesses%rowtype;v_service public.services%rowtype;v_staff public.staff%rowtype;v_local_start timestamp;v_ends_at timestamptz;v_code text;v_row public.appointments%rowtype;
+begin
+ select b.* into v_business from public.businesses b where b.id=public.current_business_id() and public.current_profile_role()='admin';if not found then raise exception 'Acceso administrativo requerido.' using errcode='42501';end if;
+ if p_starts_at>now() then raise exception 'El registro histórico debe pertenecer al pasado o al momento actual.';end if;if p_status not in ('Completada','Cancelada','No asistió') then raise exception 'El historial requiere un estado final.';end if;if p_source not in ('Cliente','Negocio') then raise exception 'Origen inválido.';end if;
+ select * into v_service from public.services where id=p_service_id and business_id=v_business.id;if not found then raise exception 'Servicio no encontrado.';end if;select * into v_staff from public.staff where id=p_staff_id and business_id=v_business.id;if not found then raise exception 'Profesional no encontrado.';end if;
+ v_ends_at:=p_starts_at+make_interval(mins=>v_service.duration_minutes);v_local_start:=p_starts_at at time zone v_business.timezone;v_code:='APT-H-'||upper(substr(encode(extensions.gen_random_bytes(8),'hex'),1,10));
+ insert into public.appointments(business_id,client_id,client_name,client_phone,client_email,service_id,staff_id,starts_at,ends_at,local_date,local_time,status,source,notes,reminder_status,email_status,confirmation_code) values(v_business.id,null,trim(p_client_name),trim(p_client_phone),lower(trim(p_client_email)),p_service_id,p_staff_id,p_starts_at,v_ends_at,v_local_start::date,v_local_start::time,p_status,p_source,coalesce(p_notes,''),case when p_status='Cancelada' then 'Cancelado' else 'Enviado' end,'No configurado',v_code) returning * into v_row;
+ perform public.write_audit(v_business.id,'Registro histórico '||v_code||' agregado con estado '||p_status);return v_row;
+exception when exclusion_violation then raise exception 'El profesional ya posee un registro que coincide con ese horario.';end;$$;
+grant execute on function public.admin_create_historical_appointment(bigint,bigint,timestamptz,text,text,text,text,text,text) to authenticated;
 
 create or replace function public.set_appointment_status(p_appointment_id bigint, p_status text)
 returns public.appointments
@@ -677,16 +696,16 @@ insert into public.businesses (
 insert into public.services (id,business_id,name,price,duration_minutes,description,active) values
   (1,'11111111-1111-1111-1111-111111111111','Corte',700,30,'Corte clásico o moderno según preferencia.',true),
   (2,'11111111-1111-1111-1111-111111111111','Corte + Barba',1200,45,'Servicio completo de corte y arreglo de barba.',true),
-  (3,'11111111-1111-1111-1111-111111111111','Spa Facial',1500,60,'Limpieza facial y cuidado básico de la piel.',true),
-  (4,'11111111-1111-1111-1111-111111111111','Peinado',900,40,'Peinado y terminación profesional.',true)
+  (3,'11111111-1111-1111-1111-111111111111','Limpieza facial masculina',1500,60,'Limpieza y cuidado facial orientado al público masculino.',true),
+  (4,'11111111-1111-1111-1111-111111111111','Peinado y styling',900,40,'Peinado, definición y acabado profesional.',true)
 on conflict (id) do update set
   name=excluded.name, price=excluded.price, duration_minutes=excluded.duration_minutes,
   description=excluded.description, active=excluded.active;
 
 insert into public.staff (id,business_id,name,specialty,schedule_label,active) values
-  (1,'11111111-1111-1111-1111-111111111111','Carlos','Barbero senior','Lun-Sáb',true),
-  (2,'11111111-1111-1111-1111-111111111111','Miguel','Corte y barba','Mar-Sáb',true),
-  (3,'11111111-1111-1111-1111-111111111111','Andrea','Estética y peinados','Lun-Vie',true)
+  (1,'11111111-1111-1111-1111-111111111111','Carlos Méndez','Barbero senior','Lun-Sáb',true),
+  (2,'11111111-1111-1111-1111-111111111111','Miguel Ramírez','Corte y arreglo de barba','Mar-Sáb',true),
+  (3,'11111111-1111-1111-1111-111111111111','Javier Santos','Styling y cuidado facial','Lun-Vie',true)
 on conflict (id) do update set
   name=excluded.name, specialty=excluded.specialty, schedule_label=excluded.schedule_label, active=excluded.active;
 

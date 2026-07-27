@@ -5,6 +5,7 @@ const CLIENT_SESSION_KEY = "appointmentsaas_client_session_v4";
 const TIME_ZONE = "America/Santo_Domingo";
 const SLOT_INTERVAL_MINUTES = 30;
 const CANCEL_LIMIT_HOURS = 2;
+const BASIC_LIMITS = { services: 4, staff: 2 };
 let cloudReady = false;
 let cloudSyncTimer = null;
 let cloudReloading = false;
@@ -87,6 +88,9 @@ function createInitialState() {
       name: "Barbería Caribe",
       phone: "809-555-0101",
       address: "Av. Winston Churchill, Santo Domingo",
+      brandColor: "#2f6fe4",
+      brandLogoText: "BC",
+      bookingMessage: "Reserva tu cita sin llamadas ni mensajes.",
       schedule,
       closures: []
     },
@@ -99,29 +103,29 @@ function createInitialState() {
     subscription: { plan: "Pro", trialDays: 17 },
     notificationSettings: { immediate: true, h24: true, h2: true },
     clientAccounts: [
-      { id: 9001, name: "Laura Gómez", phone: "809-555-2211", email: "cliente@appointmentsaas.com", password: "Cliente123!" }
+      { id: 9001, name: "Luis Gómez", phone: "809-555-2211", email: "cliente@appointmentsaas.com", password: "Cliente123!" }
     ],
     services: [
       { id: 1, name: "Corte", price: 700, duration: 30, description: "Corte clásico o moderno según preferencia.", active: true },
       { id: 2, name: "Corte + Barba", price: 1200, duration: 45, description: "Servicio completo de corte y arreglo de barba.", active: true },
-      { id: 3, name: "Spa Facial", price: 1500, duration: 60, description: "Limpieza facial y cuidado básico de la piel.", active: true },
-      { id: 4, name: "Peinado", price: 900, duration: 40, description: "Peinado y terminación profesional.", active: true }
+      { id: 3, name: "Limpieza facial masculina", price: 1500, duration: 60, description: "Limpieza y cuidado facial orientado al público masculino.", active: true },
+      { id: 4, name: "Peinado y styling", price: 900, duration: 40, description: "Peinado, definición y acabado profesional.", active: true }
     ],
     staff: [
-      { id: 1, name: "Carlos", specialty: "Barbero senior", schedule: "Lun–Sáb", active: true },
-      { id: 2, name: "Miguel", specialty: "Corte y barba", schedule: "Mar–Sáb", active: true },
-      { id: 3, name: "Andrea", specialty: "Estética y peinados", schedule: "Lun–Vie", active: true }
+      { id: 1, name: "Carlos Méndez", specialty: "Barbero senior", schedule: "Lun–Sáb", active: true },
+      { id: 2, name: "Miguel Ramírez", specialty: "Corte y arreglo de barba", schedule: "Mar–Sáb", active: true },
+      { id: 3, name: "Javier Santos", specialty: "Styling y cuidado facial", schedule: "Lun–Vie", active: true }
     ],
     appointments: [
-      { id: 101, code: "APT-540921", client: "María López", phone: "809-555-1001", email: "maria@example.com", serviceId: 1, staffId: 1, date: d0, time: "09:00", status: "Completada", source: "Cliente", notes: "", reminderStatus: "Enviado" },
+      { id: 101, code: "APT-540921", client: "José Ramírez", phone: "809-555-1001", email: "jose.ramirez@example.com", serviceId: 1, staffId: 1, date: d0, time: "09:00", status: "Completada", source: "Cliente", notes: "", reminderStatus: "Enviado" },
       { id: 102, code: "APT-114732", client: "Carlos Pérez", phone: "829-555-1002", email: "carlos@example.com", serviceId: 2, staffId: 2, date: d0, time: "10:30", status: "Confirmada", source: "Cliente", notes: "", reminderStatus: "Enviado" },
       { id: 103, code: "APT-338105", client: "Ana Díaz", phone: "849-555-1003", email: "ana@example.com", serviceId: 4, staffId: 3, date: d0, time: "15:00", status: "Pendiente", source: "Negocio", notes: "", reminderStatus: "Programado" },
       { id: 104, code: "APT-892014", client: "Luis Gómez", phone: "809-555-1004", email: "luis@example.com", serviceId: 3, staffId: 3, date: d0, time: "16:00", status: "No asistió", source: "Cliente", notes: "", reminderStatus: "Enviado" },
-      { id: 105, code: "APT-773450", client: "Rosa Martínez", phone: "829-555-1005", email: "rosa@example.com", serviceId: 2, staffId: 1, date: d1, time: "12:00", status: "Confirmada", source: "Cliente", notes: "", reminderStatus: "Programado" },
+      { id: 105, code: "APT-773450", client: "Rafael Santos", phone: "829-555-1005", email: "rafael.santos@example.com", serviceId: 2, staffId: 1, date: d1, time: "12:00", status: "Confirmada", source: "Cliente", notes: "", reminderStatus: "Programado" },
       { id: 106, code: "APT-629083", client: "José Ramírez", phone: "849-555-1006", email: "jose@example.com", serviceId: 1, staffId: 2, date: d1, time: "16:00", status: "Pendiente", source: "Negocio", notes: "", reminderStatus: "Programado" },
       { id: 107, code: "APT-482771", client: "Daniela Cruz", phone: "809-555-1007", email: "daniela@example.com", serviceId: 3, staffId: 3, date: d2, time: "16:00", status: "Confirmada", source: "Cliente", notes: "", reminderStatus: "Programado" },
       { id: 108, code: "APT-901267", client: "Pedro Santana", phone: "829-555-1008", email: "pedro@example.com", serviceId: 2, staffId: 1, date: d2, time: "17:00", status: "Cancelada", source: "Cliente", notes: "", reminderStatus: "Cancelado" },
-      { id: 109, code: "APT-140225", client: "Laura Gómez", phone: "809-555-2211", email: "cliente@appointmentsaas.com", serviceId: 2, staffId: 1, date: d3, time: "10:00", status: "Confirmada", source: "Cliente", notes: "", reminderStatus: "Programado" }
+      { id: 109, code: "APT-140225", client: "Luis Gómez", phone: "809-555-2211", email: "cliente@appointmentsaas.com", serviceId: 2, staffId: 1, date: d3, time: "10:00", status: "Confirmada", source: "Cliente", notes: "", reminderStatus: "Programado" }
     ],
     audit: [
       { id: 1, at: new Date().toISOString(), action: "Demo inicializado con horario de Santo Domingo", actor: "Sistema" }
@@ -244,7 +248,46 @@ function activeStaff() { return state.staff.filter(s => s.active); }
 function getService(id) { return state.services.find(s => s.id === Number(id)); }
 function getStaff(id) { return state.staff.find(s => s.id === Number(id)); }
 function priceOf(a) { return getService(a.serviceId)?.price || 0; }
-function sortAppointments(list) { return list.slice().sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time)); }
+function isProPlan() { return state.subscription.plan === "Pro"; }
+function planServices() { const list=activeServices(); return isProPlan()?list:list.slice(0,BASIC_LIMITS.services); }
+function planStaff() { const list=activeStaff(); return isProPlan()?list:list.slice(0,BASIC_LIMITS.staff); }
+function requirePro(featureLabel="Esta función") { if(isProPlan())return true; showToast(`${featureLabel} pertenece al Plan Pro`); return false; }
+function normalizeHexColor(value){ return /^#[0-9a-f]{6}$/i.test(String(value||""))?value:"#2f6fe4"; }
+function adjustHexColor(hex,amount){ const n=parseInt(normalizeHexColor(hex).slice(1),16);const r=Math.max(0,Math.min(255,(n>>16)+amount));const g=Math.max(0,Math.min(255,((n>>8)&255)+amount));const b=Math.max(0,Math.min(255,(n&255)+amount));return `#${[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("")}`; }
+function applyBranding(){const color=normalizeHexColor(state.business.brandColor);document.documentElement.style.setProperty("--blue",color);document.documentElement.style.setProperty("--blue2",adjustHexColor(color,28));const logo=String(state.business.brandLogoText||"BC").trim().slice(0,3).toUpperCase()||"BC";$$('[data-brand-mark]').forEach(el=>el.textContent=logo);const preview=$('[data-brand-preview]');if(preview)preview.textContent=logo;const hero=$("#publicHeroDescription");if(hero)hero.textContent=state.business.bookingMessage||"Reserva tu cita sin llamadas ni mensajes.";}
+function sortAppointments(list) {
+  return list.slice().sort((a,b) => appointmentInstant(a) - appointmentInstant(b));
+}
+function sortAppointmentsDesc(list) {
+  return list.slice().sort((a,b) => appointmentInstant(b) - appointmentInstant(a));
+}
+function isOpenAppointment(a) {
+  return ["Pendiente","Confirmada"].includes(a.status);
+}
+function agendaGroups(list) {
+  const now = new Date();
+  return {
+    upcoming: sortAppointments(list.filter(a => isOpenAppointment(a) && appointmentInstant(a) >= now)),
+    overdue: sortAppointmentsDesc(list.filter(a => isOpenAppointment(a) && appointmentInstant(a) < now)),
+    history: sortAppointmentsDesc(list.filter(a => !isOpenAppointment(a)))
+  };
+}
+function agendaSection(title, subtitle, appointments, controls=true, className="") {
+  if (!appointments.length) return "";
+  return `
+    <section class="agenda-section ${className}">
+      <div class="agenda-section-header">
+        <div>
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(subtitle)}</span>
+        </div>
+        <span class="agenda-count">${appointments.length}</span>
+      </div>
+      <div class="agenda-section-list">
+        ${appointments.map(a => appointmentRow(a,controls)).join("")}
+      </div>
+    </section>`;
+}
 
 function closureForDate(date) {
   return state.business.closures.find(c => c.date === date);
@@ -327,21 +370,25 @@ function setPublicView(name) {
 $$("[data-public-view]").forEach(b => b.addEventListener("click", () => setPublicView(b.dataset.publicView)));
 
 function renderBusinessIdentity() {
-  $$("[data-business-name]").forEach(el => el.textContent = state.business.name);
+  $$('[data-business-name]').forEach(el => el.textContent = state.business.name);
   $("#publicBusinessPhone").textContent = state.business.phone;
   $("#publicBusinessAddress").textContent = state.business.address;
   $("#publicBusinessHours").textContent = publicScheduleSummary();
   $("#businessNameSetting").value = state.business.name;
   $("#businessPhoneSetting").value = state.business.phone;
   $("#businessAddressSetting").value = state.business.address;
+  if($("#brandLogoTextSetting"))$("#brandLogoTextSetting").value=state.business.brandLogoText||"BC";
+  if($("#brandColorSetting"))$("#brandColorSetting").value=normalizeHexColor(state.business.brandColor);
+  if($("#bookingMessageSetting"))$("#bookingMessageSetting").value=state.business.bookingMessage||"Reserva tu cita sin llamadas ni mensajes.";
+  applyBranding();
   document.title = `${state.business.name} · AppointmentSaaS`;
 }
 function findNextAvailability() {
-  const service = activeServices()[0];
+  const service = planServices()[0];
   if (!service) return null;
   for (let day=0;day<30;day++) {
     const date = dateOffset(day);
-    for (const staff of activeStaff()) {
+    for (const staff of planStaff()) {
       const slots = slotsFor(service.id,staff.id,date);
       if (slots.length) return { date, time:slots[0], service, staff };
     }
@@ -350,14 +397,14 @@ function findNextAvailability() {
 }
 function renderPublicHome() {
   renderBusinessIdentity();
-  $("#publicServicesGrid").innerHTML = activeServices().map(s => `
+  $("#publicServicesGrid").innerHTML = planServices().map(s => `
     <article class="service-card">
       <div class="service-icon">${s.name.includes("Barba")?"✦":s.name.includes("Facial")?"◉":s.name.includes("Peinado")?"≈":"✂"}</div>
       <h3>${escapeHtml(s.name)}</h3>
       <p>${escapeHtml(s.description)}</p>
       <div class="service-meta"><span>${s.duration} min</span><span>${currency(s.price)}</span></div>
     </article>`).join("");
-  $("#publicStaffGrid").innerHTML = activeStaff().map(p => `
+  $("#publicStaffGrid").innerHTML = planStaff().map(p => `
     <article class="staff-card"><div class="staff-avatar">${escapeHtml(p.name.slice(0,2).toUpperCase())}</div>
     <div><strong>${escapeHtml(p.name)}</strong><small>${escapeHtml(p.specialty)}</small><small>${escapeHtml(p.schedule)}</small></div></article>`).join("");
   const next = findNextAvailability();
@@ -376,7 +423,7 @@ function resetBooking() {
   bookingStep = 1;
   bookingDraft = {
     serviceId:null,
-    staffId:activeStaff()[0]?.id || null,
+    staffId:planStaff()[0]?.id || null,
     date:zonedToday(),
     time:"",
     client:client?.name || "",
@@ -400,14 +447,14 @@ function renderBookingStep() {
   if (bookingStep===4) renderBookingSummary();
 }
 function renderBookingServices() {
-  $("#bookingServices").innerHTML = activeServices().map(s => `
+  $("#bookingServices").innerHTML = planServices().map(s => `
     <button type="button" class="select-card ${bookingDraft.serviceId===s.id?"selected":""}" data-book-service="${s.id}">
       <strong>${escapeHtml(s.name)}</strong><small>${s.duration} min · ${currency(s.price)}</small>
     </button>`).join("");
 }
 function renderBookingSchedule() {
-  $("#bookingStaff").innerHTML = activeStaff().map(p => `<option value="${p.id}">${escapeHtml(p.name)} · ${escapeHtml(p.specialty)}</option>`).join("");
-  $("#bookingStaff").value = String(bookingDraft.staffId || activeStaff()[0]?.id || "");
+  $("#bookingStaff").innerHTML = planStaff().map(p => `<option value="${p.id}">${escapeHtml(p.name)} · ${escapeHtml(p.specialty)}</option>`).join("");
+  $("#bookingStaff").value = String(bookingDraft.staffId || planStaff()[0]?.id || "");
   $("#bookingDate").min = zonedToday();
   $("#bookingDate").value = bookingDraft.date || zonedToday();
   renderAvailableTimes();
@@ -495,6 +542,7 @@ $$("[data-prev-step]").forEach(b => b.addEventListener("click", () => {
 }));
 
 async function sendRealEmail(appointment) {
+  if (!isProPlan()) { appointment.emailStatus="No configurado"; return {sent:false,message:"Plan Básico: la cita fue confirmada y el código está disponible, pero el correo automático requiere el Plan Pro."}; }
   if (cloudReady) {
     try {
       await Cloud.sendAppointmentEmail(appointment.id);
@@ -508,6 +556,8 @@ async function sendRealEmail(appointment) {
   }
   return { sent:false, message:"Modo local: la cita fue confirmada y el comprobante está disponible, pero el correo automático requiere Supabase + Resend." };
 }
+
+async function sendStatusEmailIfApplicable(appointment,type){if(!cloudReady||!isProPlan()||!appointment?.id)return;try{await Cloud.sendAppointmentEmail(appointment.id,type);}catch(error){console.warn(`No se pudo enviar el correo ${type}.`,error);}}
 
 function showBookingSuccess(appointment) {
   lastConfirmedAppointmentId = appointment.id;
@@ -635,8 +685,9 @@ $("#lookupResult").addEventListener("click", async e => {
   if (!a || hoursUntilAppointment(a)<CANCEL_LIMIT_HOURS) { showToast("La cita ya no puede cancelarse en línea"); return; }
   if (cloudReady) {
     try {
-      await Cloud.cancelMyAppointment(a.id);
+      const updated=await Cloud.cancelMyAppointment(a.id);
       await reloadCloudState(false);
+      await sendStatusEmailIfApplicable(updated,"cancellation");
       $("#lookupResult").innerHTML=lookupCard(state.appointments.find(x=>x.id===a.id) || {...a,status:"Cancelada"});
       showToast("Cita cancelada");
     } catch (error) { showToast(error.message || "No se pudo cancelar la cita"); }
@@ -740,7 +791,7 @@ $("#clientAccountPublicView").addEventListener("click",async e=>{
     const a=state.appointments.find(x=>x.id===Number(cancel.dataset.clientCancel));
     if(!a||hoursUntilAppointment(a)<CANCEL_LIMIT_HOURS){showToast("La cita ya no puede cancelarse en línea");return;}
     if (cloudReady) {
-      try { await Cloud.cancelMyAppointment(a.id); await reloadCloudState(false); renderClientAccount(); showToast("Cita cancelada"); }
+      try { const updated=await Cloud.cancelMyAppointment(a.id); await reloadCloudState(false); await sendStatusEmailIfApplicable(updated,"cancellation"); renderClientAccount(); showToast("Cita cancelada"); }
       catch (error) { showToast(error.message || "No se pudo cancelar la cita"); }
       return;
     }
@@ -824,11 +875,13 @@ function appointmentRow(a,controls=true){
   return `<div class="appointment-row"><div class="appointment-time">${formatTime(a.time)}</div><div class="appointment-main"><strong>${escapeHtml(a.client)}</strong><span>${escapeHtml(s?.name||"Servicio eliminado")} · ${formatDate(a.date)} · ${escapeHtml(p?.name||"Sin asignar")} · ${escapeHtml(a.source)}</span></div><div class="appointment-actions"><span class="status status-${a.status.toLowerCase().replace(" ","-")}">${a.status}</span>${controls&&a.status==="Pendiente"?`<button class="mini-btn" data-appt-action="confirm" data-id="${a.id}">Confirmar</button>`:""}${canChange?`<button class="mini-btn" data-appt-action="complete" data-id="${a.id}">Completar</button><button class="mini-btn" data-appt-action="noshow" data-id="${a.id}">No asistió</button><button class="mini-btn danger" data-appt-action="cancel" data-id="${a.id}">Cancelar</button>`:""}</div></div>`;
 }
 function renderPlanUI(){
-  const pro=state.subscription.plan==="Pro";
+  const pro=isProPlan();
   $("#sidebarPlanLabel").textContent=`PLAN ${state.subscription.plan.toUpperCase()}`;
-  $("#sidebarPlanDetail").textContent=pro?"Analítica y recordatorios habilitados":"Agenda, clientes y recordatorios";
+  $("#sidebarPlanDetail").textContent=pro?"Automatización, reportes, analítica y trazabilidad":`Gestión esencial · ${BASIC_LIMITS.services} servicios · ${BASIC_LIMITS.staff} profesionales`;
   $("#basicPlanCard").classList.toggle("selected",!pro);$("#proPlanCard").classList.toggle("selected",pro);
-  $("#analyticsPlanLock").classList.toggle("hidden",pro);$("#analyticsBusinessView").classList.toggle("plan-locked",!pro);
+  [["analyticsPlanLock","analyticsBusinessView"],["notificationsPlanLock","notificationsBusinessView"],["auditPlanLock","auditBusinessView"],["brandingPlanLock","brandingPanel"]].forEach(([lockId,viewId])=>{const lock=$("#"+lockId),view=$("#"+viewId);if(lock)lock.classList.toggle("hidden",pro);if(view)view.classList.toggle("plan-locked",!pro);});
+  $$(".pro-action").forEach(button=>{button.disabled=!pro;button.title=pro?"":"Disponible en el Plan Pro";});
+  ["settingImmediate","setting24h","setting2h"].forEach(id=>{const field=$("#"+id);if(field)field.disabled=!pro;});
 }
 function applyRoleUI(){
   const s=getBusinessSession(),admin=s?.role==="admin";
@@ -850,24 +903,59 @@ function renderDashboard(){
   const next=sortAppointments(list.filter(a=>["Pendiente","Confirmada"].includes(a.status)&&appointmentInstant(a)>new Date()))[0];
   const cancelled=visibleAppointments(true).filter(a=>a.status==="Cancelada").length,rate=visibleAppointments(true).length?Math.round(cancelled/visibleAppointments(true).length*100):0;
   $("#metricToday").textContent=today.length;$("#metricRevenue").textContent=employee?completed:currency(revenue);$("#metricClients").textContent=clients;$("#metricReminders").textContent=employee?pending:reminders;
-  $("#dashboardAppointments").innerHTML=sortAppointments(list).slice(0,5).map(a=>appointmentRow(a,false)).join("")||`<div class="empty-state">No hay citas activas.</div>`;
+  const dashboardGroups=agendaGroups(list);
+  const dashboardList=[
+    ...dashboardGroups.upcoming,
+    ...dashboardGroups.overdue,
+    ...dashboardGroups.history
+  ].slice(0,5);
+  $("#dashboardAppointments").innerHTML=dashboardList.map(a=>appointmentRow(a,false)).join("")||`<div class="empty-state">No hay citas registradas.</div>`;
   $("#quickPeak").textContent=hs[0]?formatTime(hs[0].time):"—";$("#quickTopService").textContent=ss[0]?.name||"—";$("#quickNextClient").textContent=next?.client||"—";$("#quickCancelRate").textContent=rate+"%";
 }
 function populateAdminSelects(){
-  $("#adminServiceSelect").innerHTML=activeServices().map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · ${currency(s.price)}</option>`).join("");
-  $("#adminStaffSelect").innerHTML=activeStaff().map(p=>`<option value="${p.id}">${escapeHtml(p.name)} · ${escapeHtml(p.specialty)}</option>`).join("");
-  $("#adminDate").min=zonedToday();if(!$("#adminDate").value)$("#adminDate").value=zonedToday();
-  const schedule=scheduleForDate($("#adminDate").value);if(!$("#adminTime").value)$("#adminTime").value=schedule.open?schedule.start:"09:00";
+  const serviceOptions=planServices().map(s=>`<option value="${s.id}">${escapeHtml(s.name)} · ${currency(s.price)}</option>`).join("");const staffOptions=planStaff().map(p=>`<option value="${p.id}">${escapeHtml(p.name)} · ${escapeHtml(p.specialty)}</option>`).join("");$("#adminServiceSelect").innerHTML=serviceOptions;$("#adminStaffSelect").innerHTML=staffOptions;if($("#historyServiceSelect"))$("#historyServiceSelect").innerHTML=serviceOptions;if($("#historyStaffSelect"))$("#historyStaffSelect").innerHTML=staffOptions;$("#adminDate").min=zonedToday();if(!$("#adminDate").value)$("#adminDate").value=zonedToday();const schedule=scheduleForDate($("#adminDate").value);if(!$("#adminTime").value)$("#adminTime").value=schedule.open?schedule.start:"09:00";if($("#historyDate")){ $("#historyDate").max=zonedToday();if(!$("#historyDate").value)$("#historyDate").value=dateOffset(-1);}if($("#historyTime")&&!$("#historyTime").value)$("#historyTime").value="10:00";
 }
 function renderAppointments(){
   const q=$("#appointmentSearch").value.trim().toLowerCase(),f=$("#appointmentStatusFilter").value;
-  const list=sortAppointments(visibleAppointments(true).filter(a=>(f==="all"||a.status===f)&&(!q||a.client.toLowerCase().includes(q)||a.phone.includes(q))));
-  const context=getBusinessSession()?.role==="employee"?`<div class="employee-context">Mostrando únicamente las citas asignadas a Carlos.</div>`:"";
-  $("#appointmentsList").innerHTML=context+(list.map(a=>appointmentRow(a,true)).join("")||`<div class="empty-state">No se encontraron citas.</div>`);
+  const filtered=visibleAppointments(true).filter(a =>
+    (f==="all"||a.status===f) &&
+    (!q||a.client.toLowerCase().includes(q)||a.phone.includes(q)||a.email.toLowerCase().includes(q))
+  );
+  const groups=agendaGroups(filtered);
+  const context=getBusinessSession()?.role==="employee"
+    ? `<div class="employee-context">Mostrando únicamente las citas asignadas a Carlos.</div>`
+    : "";
+  const content=[
+    agendaSection(
+      "Próximas citas",
+      "Reservas pendientes o confirmadas, ordenadas desde la más cercana.",
+      groups.upcoming,
+      true,
+      "agenda-upcoming"
+    ),
+    agendaSection(
+      "Pendientes por cerrar",
+      "Citas cuya hora ya pasó y todavía requieren registrar el resultado.",
+      groups.overdue,
+      true,
+      "agenda-overdue"
+    ),
+    agendaSection(
+      "Historial",
+      "Citas completadas, canceladas o marcadas como no asistió; las más recientes aparecen primero.",
+      groups.history,
+      false,
+      "agenda-history"
+    )
+  ].join("");
+  $("#appointmentsList").innerHTML=context+(content||`<div class="empty-state">No se encontraron citas.</div>`);
 }
 function renderClients(){
   const q=$("#clientSearch").value.trim().toLowerCase(),list=appointmentClients(visibleAppointments(true)).filter(c=>!q||c.name.toLowerCase().includes(q)||c.phone.includes(q)||c.email.toLowerCase().includes(q));
-  $("#clientsTable").innerHTML=`<table><thead><tr><th>Cliente</th><th>Contacto</th><th>Citas</th><th>Ingresos</th><th>Última cita</th></tr></thead><tbody>${list.map(c=>`<tr><td><strong>${escapeHtml(c.name)}</strong></td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${currency(c.revenue)}</td><td>${formatDate(c.lastDate)}</td></tr>`).join("")||`<tr><td colspan="5">Sin resultados.</td></tr>`}</tbody></table>`;
+  const employee=getBusinessSession()?.role==="employee";
+  const headers=employee?"<tr><th>Cliente</th><th>Contacto</th><th>Citas</th><th>Última cita</th></tr>":"<tr><th>Cliente</th><th>Contacto</th><th>Citas</th><th>Ingresos</th><th>Última cita</th></tr>";
+  const rows=list.map(c=>employee?`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${formatDate(c.lastDate)}</td></tr>`:`<tr><td><strong>${escapeHtml(c.name)}</strong>${c.visits>1?'<span class="client-tag">Recurrente</span>':""}</td><td>${escapeHtml(c.phone)}<br><span class="muted">${escapeHtml(c.email)}</span></td><td>${c.visits}</td><td>${currency(c.revenue)}</td><td>${formatDate(c.lastDate)}</td></tr>`).join("");
+  $("#clientsTable").innerHTML=`<table><thead>${headers}</thead><tbody>${rows||`<tr><td colspan="${employee?4:5}">Sin resultados.</td></tr>`}</tbody></table>`;
 }
 function renderServices(){
   $("#servicesAdminList").innerHTML=state.services.map(s=>`<div class="admin-service-row"><div><strong>${escapeHtml(s.name)}</strong><span>${escapeHtml(s.description)} · ${s.duration} min · ${s.active?"Activo":"Inactivo"}</span></div><div class="appointment-actions"><span class="price-tag">${currency(s.price)}</span><button class="mini-btn" data-service-toggle="${s.id}">${s.active?"Desactivar":"Activar"}</button></div></div>`).join("");
@@ -876,19 +964,14 @@ function renderStaff(){
   $("#staffAdminList").innerHTML=state.staff.map(p=>`<div class="staff-admin-card"><div class="staff-avatar">${escapeHtml(p.name.slice(0,2).toUpperCase())}</div><strong>${escapeHtml(p.name)}</strong><span>${escapeHtml(p.specialty)}</span><span>${escapeHtml(p.schedule)}</span><button class="mini-btn" style="margin-top:10px" data-staff-toggle="${p.id}">${p.active?"Desactivar":"Activar"}</button></div>`).join("");
 }
 function renderAnalytics(){
-  const list=state.appointments,ss=serviceStats(list),hs=hourStats(list),revenue=list.filter(a=>!["Cancelada","No asistió"].includes(a.status)).reduce((sum,a)=>sum+priceOf(a),0),top=ss[0];
-  const completed=list.filter(a=>a.status==="Completada").length,noShows=list.filter(a=>a.status==="No asistió").length,finalized=completed+noShows,noShowRate=finalized?Math.round(noShows/finalized*100):0;
-  const clients=appointmentClients(list),repeat=clients.filter(c=>c.visits>1).length,newClients=clients.filter(c=>c.visits===1).length,returnRate=clients.length?Math.round(repeat/clients.length*100):0;
-  $("#analyticsPeak").textContent=hs[0]?formatTime(hs[0].time):"—";$("#analyticsTopService").textContent=top?.name||"—";$("#analyticsTopServiceDetail").textContent=top?top.count+" reservas":"Sin datos";$("#analyticsRevenue").textContent=currency(revenue);
-  $("#analyticsNoShowRate").textContent=noShowRate+"%";$("#analyticsRepeatClients").textContent=repeat;$("#analyticsRepeatDetail").textContent=returnRate+"% de retorno";$("#analyticsNewClients").textContent=newClients;$("#analyticsCompleted").textContent=completed;$("#analyticsNoShows").textContent=noShows;
-  const max=Math.max(...ss.map(x=>x.revenue),1);$("#serviceBars").innerHTML=ss.map(x=>`<div class="bar-row"><strong>${escapeHtml(x.name)}</strong><div class="bar-track"><div class="bar-fill" style="width:${Math.round(x.revenue/max*100)}%"></div></div><div class="bar-value">${currency(x.revenue)}</div></div>`).join("");
-  $("#hourCards").innerHTML=hs.slice(0,4).map(x=>`<div class="hour-card"><strong>${formatTime(x.time)}</strong><span>${x.count} cita${x.count===1?"":"s"}</span></div>`).join("")||`<div class="empty-state">Sin datos.</div>`;
-  const most=ss.slice().sort((a,b)=>b.count-a.count)[0],peak=hs[0];$("#recommendations").innerHTML=`<div class="recommendation"><strong>Disponibilidad</strong><p>${peak?`La mayor demanda se concentra alrededor de las ${formatTime(peak.time)}.`:"Registra más citas."}</p></div><div class="recommendation"><strong>Promoción</strong><p>${most?`${most.name} es el servicio más solicitado.`:"Aún no hay datos."}</p></div><div class="recommendation"><strong>Retención</strong><p>${repeat?`${repeat} clientes han reservado más de una vez.`:"Todavía no se identifican clientes recurrentes."}</p></div>`;
+  const list=state.appointments,ss=serviceStats(list),hs=hourStats(list);const activeRevenue=list.filter(a=>!["Cancelada","No asistió"].includes(a.status)).reduce((sum,a)=>sum+priceOf(a),0);const completedRevenue=list.filter(a=>a.status==="Completada").reduce((sum,a)=>sum+priceOf(a),0);const lostRevenue=list.filter(a=>["Cancelada","No asistió"].includes(a.status)).reduce((sum,a)=>sum+priceOf(a),0);const top=ss[0];
+  const completed=list.filter(a=>a.status==="Completada").length,noShows=list.filter(a=>a.status==="No asistió").length,finalized=completed+noShows,noShowRate=finalized?Math.round(noShows/finalized*100):0;const clients=appointmentClients(list),repeat=clients.filter(c=>c.visits>1).length,newClients=clients.filter(c=>c.visits===1).length,returnRate=clients.length?Math.round(repeat/clients.length*100):0;
+  const staffStats=state.staff.map(person=>{const apps=list.filter(a=>a.staffId===person.id&&a.status==="Completada");return{name:person.name,count:apps.length,revenue:apps.reduce((sum,a)=>sum+priceOf(a),0)}}).sort((a,b)=>b.revenue-a.revenue||b.count-a.count);const topStaff=staffStats[0];const dayMap={};list.filter(a=>a.status!=="Cancelada").forEach(a=>{const day=DAY_NAMES[dayIndex(a.date)];dayMap[day]=(dayMap[day]||0)+1});const bestDay=Object.entries(dayMap).sort((a,b)=>b[1]-a[1])[0];
+  $("#analyticsPeak").textContent=hs[0]?formatTime(hs[0].time):"—";$("#analyticsTopService").textContent=top?.name||"—";$("#analyticsTopServiceDetail").textContent=top?top.count+" reservas":"Sin datos";$("#analyticsRevenue").textContent=currency(activeRevenue);$("#analyticsNoShowRate").textContent=noShowRate+"%";$("#analyticsRepeatClients").textContent=repeat;$("#analyticsRepeatDetail").textContent=returnRate+"% de retorno";$("#analyticsNewClients").textContent=newClients;$("#analyticsCompleted").textContent=completed;$("#analyticsNoShows").textContent=noShows;$("#analyticsLostRevenue").textContent=currency(lostRevenue);$("#analyticsTopStaff").textContent=topStaff?.name||"—";$("#analyticsTopStaffDetail").textContent=topStaff?`${topStaff.count} servicios · ${currency(topStaff.revenue)}`:"Sin datos";$("#analyticsBestDay").textContent=bestDay?.[0]||"—";$("#analyticsBestDayDetail").textContent=bestDay?`${bestDay[1]} citas registradas`:"Sin datos";$("#analyticsCompletedRevenue").textContent=currency(completedRevenue);
+  const max=Math.max(...ss.map(x=>x.revenue),1);$("#serviceBars").innerHTML=ss.map(x=>`<div class="bar-row"><strong>${escapeHtml(x.name)}</strong><div class="bar-track"><div class="bar-fill" style="width:${Math.round(x.revenue/max*100)}%"></div></div><div class="bar-value">${currency(x.revenue)}</div></div>`).join("");$("#hourCards").innerHTML=hs.slice(0,4).map(x=>`<div class="hour-card"><strong>${formatTime(x.time)}</strong><span>${x.count} cita${x.count===1?"":"s"}</span></div>`).join("")||`<div class="empty-state">Sin datos.</div>`;const most=ss.slice().sort((a,b)=>b.count-a.count)[0],peak=hs[0];$("#recommendations").innerHTML=`<div class="recommendation"><strong>Disponibilidad</strong><p>${peak?`La mayor demanda se concentra alrededor de las ${formatTime(peak.time)}.`:"Registra más citas."}</p></div><div class="recommendation"><strong>Promoción</strong><p>${most?`${most.name} es el servicio más solicitado.`:"Aún no hay datos."}</p></div><div class="recommendation"><strong>Retención</strong><p>${repeat?`${repeat} clientes han reservado más de una vez.`:"Todavía no se identifican clientes recurrentes."}</p></div><div class="recommendation"><strong>Ingresos recuperables</strong><p>${lostRevenue?`Las cancelaciones e inasistencias representan ${currency(lostRevenue)} en ingresos potenciales.`:"No hay pérdida estimada registrada."}</p></div>`;
 }
 function renderNotifications(){
-  const list=sortAppointments(state.appointments).filter(a=>a.status!=="Cancelada");
-  $("#notificationsList").innerHTML=list.map(a=>`<div class="notification-row"><div><strong>${escapeHtml(a.client)} · ${escapeHtml(getService(a.serviceId)?.name||"Servicio")}</strong><span>${formatDate(a.date)} · ${formatTime(a.time)} · ${escapeHtml(a.email)}</span></div><span class="status status-${a.reminderStatus==="Enviado"?"confirmada":"pendiente"}">${a.reminderStatus}</span></div>`).join("")||`<div class="empty-state">No hay recordatorios.</div>`;
-  $("#settingImmediate").checked=state.notificationSettings.immediate;$("#setting24h").checked=state.notificationSettings.h24;$("#setting2h").checked=state.notificationSettings.h2;
+  const notificationGroups=agendaGroups(state.appointments.filter(a=>a.status!=="Cancelada"));const list=[...notificationGroups.upcoming,...notificationGroups.overdue,...notificationGroups.history];$("#notificationsList").innerHTML=list.map(a=>`<div class="notification-row"><div><strong>${escapeHtml(a.client)} · ${escapeHtml(getService(a.serviceId)?.name||"Servicio")}</strong><span>${formatDate(a.date)} · ${formatTime(a.time)} · ${escapeHtml(a.email)}</span></div><div class="notification-statuses"><span class="status status-${a.emailStatus==="Enviado"?"confirmada":"pendiente"}">Correo: ${escapeHtml(a.emailStatus||"Pendiente")}</span><span class="status status-${a.reminderStatus==="Enviado"?"confirmada":"pendiente"}">Aviso: ${escapeHtml(a.reminderStatus)}</span></div></div>`).join("")||`<div class="empty-state">No hay recordatorios.</div>`;$("#settingImmediate").checked=state.notificationSettings.immediate;$("#setting24h").checked=state.notificationSettings.h24;$("#setting2h").checked=state.notificationSettings.h2;
 }
 function renderAudit(){
   $("#auditList").innerHTML=state.audit.map(e=>`<div class="audit-row"><time>${new Intl.DateTimeFormat("es-DO",{timeZone:TIME_ZONE,day:"2-digit",month:"short",hour:"numeric",minute:"2-digit"}).format(new Date(e.at))}</time><strong>${escapeHtml(e.action)}</strong><span>${escapeHtml(e.actor)}</span></div>`).join("")||`<div class="empty-state">La bitácora está vacía.</div>`;
@@ -909,20 +992,18 @@ function renderClosures(){
   $("#closureDate").min=zonedToday();
   $("#closuresList").innerHTML=state.business.closures.length?state.business.closures.sort((a,b)=>a.date.localeCompare(b.date)).map(c=>`<div class="closure-row"><div><strong>${formatDate(c.date)}</strong><span>${escapeHtml(c.reason)}</span></div><button class="mini-btn danger" data-remove-closure="${c.date}">Eliminar</button></div>`).join(""):`<div class="empty-state">No hay cierres especiales configurados.</div>`;
 }
-function renderEmailSettings(){
-  const status = $("#cloudEmailStatusText");
-  if (!status) return;
-  status.textContent = cloudReady
-    ? "Integración preparada. El envío depende de que RESEND_API_KEY y RESEND_FROM estén configurados en Supabase Edge Function Secrets."
-    : "Modo local activo: no se envían correos automáticos reales.";
-  const storage = $("#dataStorageDescription");
-  if (storage) storage.textContent = cloudReady
-    ? "PostgreSQL real en Supabase con autenticación y Row Level Security."
-    : "Modo local de respaldo mediante localStorage; configura Supabase para datos compartidos.";
+function renderEmailSettings(){const status=$("#cloudEmailStatusText");if(status){if(!isProPlan())status.textContent="Plan Básico activo: los correos automáticos están deshabilitados.";else status.textContent=cloudReady?"Integración lista para confirmaciones y cancelaciones. Los recordatorios 24 h/2 h requieren desplegar y programar la función incluida.":"Modo local activo: no se envían correos automáticos reales.";}const storage=$("#dataStorageDescription");if(storage)storage.textContent=cloudReady?"PostgreSQL real en Supabase con autenticación y Row Level Security.":"Modo local de respaldo mediante localStorage; configura Supabase para datos compartidos.";if($("#resetDemoBtn"))$("#resetDemoBtn").textContent=cloudReady?"Actualizar datos":"Restablecer demo";
 }
+function csvEscape(value){const text=String(value??"");return `"${text.replaceAll('"','""')}"`;}
+function downloadCsv(filename,rows){const csv="\ufeff"+rows.map(row=>row.map(csvEscape).join(",")).join("\r\n");downloadText(filename,csv,"text/csv;charset=utf-8");}
+function exportAppointmentsCsv(){if(!requirePro("La exportación de citas"))return;const rows=[["Código","Cliente","Teléfono","Correo","Servicio","Profesional","Fecha","Hora","Estado","Origen","Precio"]];sortAppointmentsDesc(state.appointments).forEach(a=>rows.push([a.code,a.client,a.phone,a.email,getService(a.serviceId)?.name||"",getStaff(a.staffId)?.name||"",a.date,a.time,a.status,a.source,priceOf(a)]));downloadCsv(`appointmentsaas-citas-${zonedToday()}.csv`,rows);addAudit("Reporte CSV de citas exportado");}
+function exportClientsCsv(){if(!requirePro("La exportación de clientes"))return;const rows=[["Cliente","Teléfono","Correo","Citas válidas","Ingresos asociados","Última cita"]];appointmentClients(state.appointments).forEach(c=>rows.push([c.name,c.phone,c.email,c.visits,c.revenue,c.lastDate]));downloadCsv(`appointmentsaas-clientes-${zonedToday()}.csv`,rows);addAudit("Reporte CSV de clientes exportado");}
+function exportAnalyticsCsv(){if(!requirePro("El resumen analítico"))return;const clients=appointmentClients(state.appointments),completed=state.appointments.filter(a=>a.status==="Completada"),noShows=state.appointments.filter(a=>a.status==="No asistió"),cancelled=state.appointments.filter(a=>a.status==="Cancelada");const rows=[["Indicador","Valor"],["Negocio",state.business.name],["Fecha de exportación",zonedToday()],["Citas totales",state.appointments.length],["Citas completadas",completed.length],["No asistieron",noShows.length],["Canceladas",cancelled.length],["Clientes únicos",clients.length],["Clientes recurrentes",clients.filter(c=>c.visits>1).length],["Ingresos completados",completed.reduce((s,a)=>s+priceOf(a),0)],["Ingresos potenciales perdidos",[...noShows,...cancelled].reduce((s,a)=>s+priceOf(a),0)]];downloadCsv(`appointmentsaas-resumen-${zonedToday()}.csv`,rows);addAudit("Resumen analítico CSV exportado");}
 function renderAll(){
   renderBusinessIdentity();renderPublicHome();renderPlanUI();applyRoleUI();populateAdminSelects();renderDashboard();renderAppointments();renderClients();renderServices();renderStaff();renderAnalytics();renderNotifications();renderAudit();renderWeeklySchedule();renderClosures();renderEmailSettings();renderClientHeader();
 }
+
+$$("[data-appointment-form-tab]").forEach(button=>button.addEventListener("click",()=>{const mode=button.dataset.appointmentFormTab;$$("[data-appointment-form-tab]").forEach(item=>item.classList.toggle("active",item===button));$("#adminAppointmentForm").classList.toggle("hidden",mode!=="future");$("#historicalAppointmentForm").classList.toggle("hidden",mode!=="history");$("#appointmentFormTitle").textContent=mode==="future"?"Nueva cita":"Registrar historial";populateAdminSelects();}));
 
 $("#adminAppointmentForm").addEventListener("submit",async e=>{
   e.preventDefault();
@@ -938,6 +1019,7 @@ $("#adminAppointmentForm").addEventListener("submit",async e=>{
     e.target.reset();populateAdminSelects();renderAll();showToast("Cita agregada");
   } catch (error) { console.error(error); showToast(error.message || "No se pudo agregar la cita"); }
 });
+$("#historicalAppointmentForm").addEventListener("submit",async e=>{e.preventDefault();const payload={client:$("#historyClientName").value.trim(),phone:$("#historyClientPhone").value.trim(),email:$("#historyClientEmail").value.trim().toLowerCase(),serviceId:Number($("#historyServiceSelect").value),staffId:Number($("#historyStaffSelect").value),date:$("#historyDate").value,time:$("#historyTime").value,status:$("#historyStatus").value,source:$("#historySource").value,notes:$("#historyNotes").value.trim()};if(!payload.date||payload.date>zonedToday()){showToast("Selecciona una fecha pasada o de hoy");return;}try{if(cloudReady){await Cloud.createHistoricalAppointment(payload);await reloadCloudState(false);}else{const a={id:Date.now(),code:generateCode(),...payload,reminderStatus:payload.status==="Cancelada"?"Cancelado":"Enviado",emailStatus:"No configurado"};state.appointments.push(a);addAudit(`Registro histórico ${a.code} agregado`);saveState();renderAll();}e.target.reset();populateAdminSelects();showToast("Registro histórico guardado");}catch(error){console.error(error);showToast(error.message||"No se pudo guardar el historial");}});
 $("#adminDate").addEventListener("change",()=>{const s=scheduleForDate($("#adminDate").value);if(s.open)$("#adminTime").value=s.start;});
 $("#appointmentsList").addEventListener("click",async e=>{
   const b=e.target.closest("[data-appt-action]");if(!b)return;const a=state.appointments.find(x=>x.id===Number(b.dataset.id));if(!a)return;
@@ -945,7 +1027,7 @@ $("#appointmentsList").addEventListener("click",async e=>{
   const statuses={confirm:"Confirmada",complete:"Completada",noshow:"No asistió",cancel:"Cancelada"};
   const nextStatus=statuses[b.dataset.apptAction];
   try {
-    if (cloudReady) { await Cloud.setAppointmentStatus(a.id,nextStatus); await reloadCloudState(false); }
+    if (cloudReady) { const updated=await Cloud.setAppointmentStatus(a.id,nextStatus); await reloadCloudState(false); if(nextStatus==="Cancelada")await sendStatusEmailIfApplicable(updated,"cancellation"); }
     else {
       a.status=nextStatus;if(nextStatus==="Cancelada")a.reminderStatus="Cancelado";
       addAudit(`Cita ${a.code} actualizada a "${a.status}"`);saveState();renderAll();
@@ -954,14 +1036,19 @@ $("#appointmentsList").addEventListener("click",async e=>{
   } catch (error) { console.error(error); showToast(error.message || "No se pudo actualizar la cita"); }
 });
 $("#appointmentSearch").addEventListener("input",renderAppointments);$("#appointmentStatusFilter").addEventListener("change",renderAppointments);$("#clientSearch").addEventListener("input",renderClients);
-$("#serviceForm").addEventListener("submit",e=>{e.preventDefault();const s={id:Date.now(),name:$("#serviceName").value.trim(),price:Number($("#servicePrice").value),duration:Number($("#serviceDuration").value),description:$("#serviceDescription").value.trim(),active:true};state.services.push(s);addAudit(`Servicio "${s.name}" agregado`);saveState();e.target.reset();renderAll();showToast("Servicio agregado");});
-$("#servicesAdminList").addEventListener("click",e=>{const b=e.target.closest("[data-service-toggle]");if(!b)return;const s=state.services.find(x=>x.id===Number(b.dataset.serviceToggle));s.active=!s.active;addAudit(`Servicio "${s.name}" ${s.active?"activado":"desactivado"}`);saveState();renderAll();});
-$("#staffForm").addEventListener("submit",e=>{e.preventDefault();const p={id:Date.now(),name:$("#staffName").value.trim(),specialty:$("#staffSpecialty").value.trim(),schedule:$("#staffSchedule").value.trim(),active:true};state.staff.push(p);addAudit(`Profesional "${p.name}" agregado`);saveState();e.target.reset();renderAll();});
-$("#staffAdminList").addEventListener("click",e=>{const b=e.target.closest("[data-staff-toggle]");if(!b)return;const p=state.staff.find(x=>x.id===Number(b.dataset.staffToggle));p.active=!p.active;addAudit(`Profesional "${p.name}" ${p.active?"activado":"desactivado"}`);saveState();renderAll();});
+$("#serviceForm").addEventListener("submit",e=>{e.preventDefault();if(!isProPlan()&&activeServices().length>=BASIC_LIMITS.services){showToast(`El Plan Básico admite hasta ${BASIC_LIMITS.services} servicios activos`);return;}const s={id:Date.now(),name:$("#serviceName").value.trim(),price:Number($("#servicePrice").value),duration:Number($("#serviceDuration").value),description:$("#serviceDescription").value.trim(),active:true};state.services.push(s);addAudit(`Servicio "${s.name}" agregado`);saveState();e.target.reset();renderAll();showToast("Servicio agregado");});
+$("#servicesAdminList").addEventListener("click",e=>{const b=e.target.closest("[data-service-toggle]");if(!b)return;const s=state.services.find(x=>x.id===Number(b.dataset.serviceToggle));if(!s.active&&!isProPlan()&&activeServices().length>=BASIC_LIMITS.services){showToast(`El Plan Básico admite hasta ${BASIC_LIMITS.services} servicios activos`);return;}s.active=!s.active;addAudit(`Servicio "${s.name}" ${s.active?"activado":"desactivado"}`);saveState();renderAll();});
+$("#staffForm").addEventListener("submit",e=>{e.preventDefault();if(!isProPlan()&&activeStaff().length>=BASIC_LIMITS.staff){showToast(`El Plan Básico admite hasta ${BASIC_LIMITS.staff} profesionales activos`);return;}const p={id:Date.now(),name:$("#staffName").value.trim(),specialty:$("#staffSpecialty").value.trim(),schedule:$("#staffSchedule").value.trim(),active:true};state.staff.push(p);addAudit(`Profesional "${p.name}" agregado`);saveState();e.target.reset();renderAll();showToast("Profesional agregado");});
+$("#staffAdminList").addEventListener("click",e=>{const b=e.target.closest("[data-staff-toggle]");if(!b)return;const p=state.staff.find(x=>x.id===Number(b.dataset.staffToggle));if(!p.active&&!isProPlan()&&activeStaff().length>=BASIC_LIMITS.staff){showToast(`El Plan Básico admite hasta ${BASIC_LIMITS.staff} profesionales activos`);return;}p.active=!p.active;addAudit(`Profesional "${p.name}" ${p.active?"activado":"desactivado"}`);saveState();renderAll();});
 $$("[data-plan-select]").forEach(b=>b.addEventListener("click",()=>{state.subscription.plan=b.dataset.planSelect;addAudit(`Plan cambiado a ${state.subscription.plan}`);saveState();renderAll();}));
-$("#settingImmediate").addEventListener("change",e=>{state.notificationSettings.immediate=e.target.checked;saveState();});
-$("#setting24h").addEventListener("change",e=>{state.notificationSettings.h24=e.target.checked;saveState();});
-$("#setting2h").addEventListener("change",e=>{state.notificationSettings.h2=e.target.checked;saveState();});
+$("#settingImmediate").addEventListener("change",e=>{if(!requirePro("La automatización de confirmaciones")){e.target.checked=state.notificationSettings.immediate;return;}state.notificationSettings.immediate=e.target.checked;saveState();});
+$("#setting24h").addEventListener("change",e=>{if(!requirePro("El recordatorio de 24 horas")){e.target.checked=state.notificationSettings.h24;return;}state.notificationSettings.h24=e.target.checked;saveState();});
+$("#setting2h").addEventListener("change",e=>{if(!requirePro("El recordatorio de 2 horas")){e.target.checked=state.notificationSettings.h2;return;}state.notificationSettings.h2=e.target.checked;saveState();});
+$("#exportAppointmentsBtn").addEventListener("click",exportAppointmentsCsv);
+$("#exportClientsBtn").addEventListener("click",exportClientsCsv);
+$("#exportAnalyticsBtn").addEventListener("click",exportAnalyticsCsv);
+$("#brandingSettingsForm").addEventListener("submit",e=>{e.preventDefault();if(!requirePro("La personalización del portal"))return;state.business.brandLogoText=$("#brandLogoTextSetting").value.trim().slice(0,3).toUpperCase()||"BC";state.business.brandColor=normalizeHexColor($("#brandColorSetting").value);state.business.bookingMessage=$("#bookingMessageSetting").value.trim()||"Reserva tu cita sin llamadas ni mensajes.";addAudit("Personalización del portal actualizada");saveState();renderAll();showToast("Personalización guardada");});
+$("#brandColorSetting").addEventListener("input",e=>{$("#brandingPreview").style.background=e.target.value;});
 $("#businessSettingsForm").addEventListener("submit",e=>{e.preventDefault();state.business.name=$("#businessNameSetting").value.trim();state.business.phone=$("#businessPhoneSetting").value.trim();state.business.address=$("#businessAddressSetting").value.trim();addAudit("Perfil del negocio actualizado");saveState();renderAll();showToast("Perfil actualizado");});
 $("#weeklyScheduleEditor").addEventListener("change",e=>{
   const row = e.target.closest("[data-schedule-day]");
@@ -993,10 +1080,7 @@ $("#clearAuditBtn").addEventListener("click",()=>{
   if (cloudReady) { showToast("La bitácora de producción no se elimina desde el navegador"); return; }
   state.audit=[];saveState();renderAudit();
 });
-$("#resetDemoBtn").addEventListener("click",()=>{
-  if (cloudReady) { showToast("El restablecimiento de PostgreSQL se realiza con el script de seed"); return; }
-  state=createInitialState();saveState();clearClientSession();renderAll();showToast("Demo restablecido");
-});
+$("#resetDemoBtn").addEventListener("click",async ()=>{if(cloudReady){await reloadCloudState(false);showToast("Datos actualizados desde PostgreSQL");return;}state=createInitialState();saveState();clearClientSession();renderAll();showToast("Demo restablecido");});
 
 async function bootstrapApplication(){
   state=loadState();

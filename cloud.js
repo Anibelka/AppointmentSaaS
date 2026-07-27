@@ -107,6 +107,9 @@ const Cloud = {
         phone: business.phone || '',
         address: business.address || '',
         timezone: business.timezone || 'America/Santo_Domingo',
+        brandColor: business.brand_primary_color || '#2f6fe4',
+        brandLogoText: business.brand_logo_text || 'BC',
+        bookingMessage: business.booking_message || 'Reserva tu cita sin llamadas ni mensajes.',
         schedule,
         closures: closuresResult.data.map(row => ({
           id: Number(row.id),
@@ -221,6 +224,17 @@ const Cloud = {
     return this.mapAppointment(data);
   },
 
+  async createHistoricalAppointment(payload) {
+    const startsAt = new Date(`${payload.date}T${payload.time}:00-04:00`).toISOString();
+    const { data, error } = await this.client.rpc('admin_create_historical_appointment', {
+      p_service_id: payload.serviceId, p_staff_id: payload.staffId, p_starts_at: startsAt,
+      p_client_name: payload.client, p_client_phone: payload.phone, p_client_email: payload.email,
+      p_status: payload.status, p_source: payload.source, p_notes: payload.notes || '',
+    });
+    if (error) throw error;
+    return this.mapAppointment(data);
+  },
+
   async setAppointmentStatus(id, status) {
     const { data, error } = await this.client.rpc('set_appointment_status', {
       p_appointment_id: id,
@@ -260,9 +274,9 @@ const Cloud = {
     };
   },
 
-  async sendAppointmentEmail(appointmentId) {
+  async sendAppointmentEmail(appointmentId, messageType = 'confirmation') {
     const { data, error } = await this.client.functions.invoke('send-appointment-email', {
-      body: { appointment_id: appointmentId },
+      body: { appointment_id: appointmentId, message_type: messageType },
     });
     if (error) throw error;
     return data;
@@ -286,6 +300,9 @@ const Cloud = {
       notification_immediate: state.notificationSettings.immediate,
       notification_24h: state.notificationSettings.h24,
       notification_2h: state.notificationSettings.h2,
+      brand_primary_color: state.business.brandColor || '#2f6fe4',
+      brand_logo_text: state.business.brandLogoText || 'BC',
+      booking_message: state.business.bookingMessage || 'Reserva tu cita sin llamadas ni mensajes.',
     }).eq('id', businessId);
     if (businessError) throw businessError;
 

@@ -14,7 +14,7 @@
   <div id="publicPortal">
     <header class="public-header">
       <button class="brand brand-button" data-public-view="home" aria-label="Ir al inicio">
-        <span class="brand-mark">A</span>
+        <span class="brand-mark" data-brand-mark>A</span>
         <span>
           <strong>AppointmentSaaS</strong>
           <small>Reservas inteligentes</small>
@@ -35,7 +35,7 @@
           <div class="hero-copy">
             <span class="eyebrow"><span data-business-name>Barbería Caribe</span> · DEMO</span>
             <h1>Reserva tu cita sin llamadas ni mensajes.</h1>
-            <p>
+            <p id="publicHeroDescription">
               Elige el servicio, el profesional y la hora disponible. Recibe una confirmación
               inmediata y consulta tu reserva cuando lo necesites.
             </p>
@@ -348,7 +348,7 @@
   <div id="businessPortal" class="app-shell hidden">
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-mark">A</span>
+        <span class="brand-mark" data-brand-mark>A</span>
         <span>
           <strong>AppointmentSaaS</strong>
           <small>Panel del negocio</small>
@@ -362,9 +362,9 @@
         <button class="nav-item" data-business-view="services" data-admin-only>Servicios</button>
         <button class="nav-item" data-business-view="staff" data-admin-only>Personal</button>
         <button class="nav-item" data-business-view="analytics" data-admin-only>Analítica <span class="nav-pro-tag">PRO</span></button>
-        <button class="nav-item" data-business-view="notifications" data-admin-only>Recordatorios</button>
+        <button class="nav-item" data-business-view="notifications" data-admin-only>Recordatorios <span class="nav-pro-tag">PRO</span></button>
         <button class="nav-item" data-business-view="subscription" data-admin-only>Suscripción</button>
-        <button class="nav-item" data-business-view="audit" data-admin-only>Bitácora</button>
+        <button class="nav-item" data-business-view="audit" data-admin-only>Bitácora <span class="nav-pro-tag">PRO</span></button>
         <button class="nav-item" data-business-view="settings" data-admin-only>Configuración</button>
       </nav>
 
@@ -384,7 +384,7 @@
           <h1 id="businessPageTitle">Resumen del negocio</h1>
         </div>
         <div class="topbar-actions">
-          <button id="resetDemoBtn" class="btn btn-soft" data-admin-only>Restablecer demo</button>
+          <button id="resetDemoBtn" class="btn btn-soft" data-admin-only>Actualizar datos</button>
           <div class="user-chip">
             <span id="sessionAvatar" class="avatar">AS</span>
             <span>
@@ -455,9 +455,13 @@
         <div class="appointments-layout">
           <article id="manualAppointmentPanel" class="panel sticky" data-admin-only>
             <div class="panel-header">
-              <div><span class="eyebrow">REGISTRO MANUAL</span><h2>Nueva cita</h2></div>
+              <div><span class="eyebrow">REGISTRO MANUAL</span><h2 id="appointmentFormTitle">Nueva cita</h2></div>
             </div>
-            <form id="adminAppointmentForm" class="form-stack">
+            <div class="form-mode-tabs">
+              <button type="button" class="form-mode-tab active" data-appointment-form-tab="future">Cita futura</button>
+              <button type="button" class="form-mode-tab" data-appointment-form-tab="history">Registrar historial</button>
+            </div>
+            <form id="adminAppointmentForm" class="form-stack appointment-mode-panel">
               <label>Cliente<input id="adminClientName" type="text" required /></label>
               <label>Teléfono<input id="adminClientPhone" type="tel" required /></label>
               <label>Correo<input id="adminClientEmail" type="email" required /></label>
@@ -469,11 +473,38 @@
               </div>
               <button class="btn btn-primary btn-block" type="submit">Agregar a la agenda</button>
             </form>
+            <form id="historicalAppointmentForm" class="form-stack appointment-mode-panel hidden">
+              <p class="notice neutral compact-notice">Usa esta opción para incorporar registros anteriores sin permitir reservas públicas en fechas pasadas.</p>
+              <label>Cliente<input id="historyClientName" type="text" required /></label>
+              <label>Teléfono<input id="historyClientPhone" type="tel" required /></label>
+              <label>Correo<input id="historyClientEmail" type="email" required /></label>
+              <label>Servicio<select id="historyServiceSelect" required></select></label>
+              <label>Profesional<select id="historyStaffSelect" required></select></label>
+              <div class="form-grid">
+                <label>Fecha pasada<input id="historyDate" type="date" required /></label>
+                <label>Hora<input id="historyTime" type="time" required /></label>
+              </div>
+              <label>Resultado
+                <select id="historyStatus" required>
+                  <option value="Completada">Completada</option>
+                  <option value="No asistió">No asistió</option>
+                  <option value="Cancelada">Cancelada</option>
+                </select>
+              </label>
+              <label>Origen
+                <select id="historySource" required>
+                  <option value="Negocio">Negocio</option>
+                  <option value="Cliente">Cliente</option>
+                </select>
+              </label>
+              <label>Observación<input id="historyNotes" type="text" placeholder="Ej. Registro migrado de la agenda anterior" /></label>
+              <button class="btn btn-primary btn-block" type="submit">Guardar en el historial</button>
+            </form>
           </article>
 
           <article class="panel">
             <div class="panel-header wrap">
-              <div><span class="eyebrow">AGENDA</span><h2>Citas programadas</h2></div>
+              <div><span class="eyebrow">AGENDA</span><h2>Agenda e historial</h2></div>
               <div class="toolbar">
                 <input id="appointmentSearch" type="search" placeholder="Buscar cliente..." />
                 <select id="appointmentStatusFilter">
@@ -484,6 +515,7 @@
                   <option value="No asistió">No asistió</option>
                   <option value="Cancelada">Canceladas</option>
                 </select>
+                <button id="exportAppointmentsBtn" class="btn btn-soft pro-action" type="button">Exportar CSV <span class="nav-pro-tag">PRO</span></button>
               </div>
             </div>
             <div id="appointmentsList" class="stack-list"></div>
@@ -495,7 +527,10 @@
         <article class="panel">
           <div class="panel-header wrap">
             <div><span class="eyebrow">CRM BÁSICO</span><h2>Clientes e historial</h2></div>
-            <input id="clientSearch" type="search" placeholder="Buscar cliente..." />
+            <div class="toolbar">
+              <input id="clientSearch" type="search" placeholder="Buscar cliente..." />
+              <button id="exportClientsBtn" class="btn btn-soft pro-action" type="button">Exportar CSV <span class="nav-pro-tag">PRO</span></button>
+            </div>
           </div>
           <div id="clientsTable" class="table-wrap"></div>
         </article>
@@ -557,19 +592,28 @@
           </div>
           <button class="btn btn-primary" data-business-view="subscription">Ver planes</button>
         </div>
-        <div class="metric-grid">
+        <div class="module-actions pro-content">
+          <button id="exportAnalyticsBtn" class="btn btn-soft" type="button">Descargar resumen CSV</button>
+        </div>
+        <div class="metric-grid pro-content">
           <article class="metric-card accent"><span>Hora pico</span><strong id="analyticsPeak">—</strong><small>Mayor demanda</small></article>
           <article class="metric-card"><span>Servicio top</span><strong id="analyticsTopService">—</strong><small id="analyticsTopServiceDetail">—</small></article>
           <article class="metric-card"><span>Ingresos proyectados</span><strong id="analyticsRevenue">RD$ 0</strong><small>Citas activas y completadas</small></article>
           <article class="metric-card"><span>Tasa de no-show</span><strong id="analyticsNoShowRate">0%</strong><small>Según citas finalizadas</small></article>
         </div>
-        <div class="metric-grid retention-grid">
+        <div class="metric-grid retention-grid pro-content">
           <article class="metric-card"><span>Clientes recurrentes</span><strong id="analyticsRepeatClients">0</strong><small id="analyticsRepeatDetail">0% de retorno</small></article>
           <article class="metric-card"><span>Clientes nuevos</span><strong id="analyticsNewClients">0</strong><small>Una sola reserva registrada</small></article>
           <article class="metric-card"><span>Citas completadas</span><strong id="analyticsCompleted">0</strong><small>Servicios realizados</small></article>
           <article class="metric-card"><span>No asistieron</span><strong id="analyticsNoShows">0</strong><small>Ausencias registradas</small></article>
         </div>
-        <div class="two-column">
+        <div class="metric-grid pro-content">
+          <article class="metric-card"><span>Ingresos potenciales perdidos</span><strong id="analyticsLostRevenue">RD$ 0</strong><small>Cancelaciones e inasistencias</small></article>
+          <article class="metric-card"><span>Profesional destacado</span><strong id="analyticsTopStaff">—</strong><small id="analyticsTopStaffDetail">Sin datos</small></article>
+          <article class="metric-card"><span>Día con mayor demanda</span><strong id="analyticsBestDay">—</strong><small id="analyticsBestDayDetail">Sin datos</small></article>
+          <article class="metric-card"><span>Ingreso completado</span><strong id="analyticsCompletedRevenue">RD$ 0</strong><small>Servicios efectivamente realizados</small></article>
+        </div>
+        <div class="two-column pro-content">
           <article class="panel">
             <div class="panel-header"><div><span class="eyebrow">RENTABILIDAD</span><h2>Ingresos por servicio</h2></div></div>
             <div id="serviceBars" class="bars"></div>
@@ -579,26 +623,34 @@
             <div id="hourCards" class="hour-grid"></div>
           </article>
         </div>
-        <article class="panel">
+        <article class="panel pro-content">
           <div class="panel-header"><div><span class="eyebrow">RECOMENDACIONES</span><h2>Decisiones sugeridas</h2></div></div>
           <div id="recommendations" class="recommendation-grid"></div>
         </article>
       </section>
 
       <section id="notificationsBusinessView" class="business-view hidden">
-        <div class="two-column balanced">
+        <div id="notificationsPlanLock" class="feature-lock hidden">
+          <span class="lock-icon">✉</span>
+          <div>
+            <strong>La automatización de correos pertenece al Plan Pro</strong>
+            <p>El Plan Básico conserva la agenda y el código de confirmación, pero no envía correos automáticos ni recordatorios programados.</p>
+          </div>
+          <button class="btn btn-primary" data-business-view="subscription">Ver planes</button>
+        </div>
+        <div class="two-column balanced pro-content">
           <article class="panel">
             <div class="panel-header"><div><span class="eyebrow">COLA DE MENSAJES</span><h2>Recordatorios</h2></div></div>
             <div id="notificationsList" class="stack-list"></div>
           </article>
           <article class="panel">
-            <div class="panel-header"><div><span class="eyebrow">CONFIGURACIÓN SIMULADA</span><h2>Reglas de envío</h2></div></div>
+            <div class="panel-header"><div><span class="eyebrow">AUTOMATIZACIÓN PRO</span><h2>Reglas de envío</h2></div></div>
             <div class="settings-stack">
               <label class="toggle-row"><span><strong>Confirmación inmediata</strong><small>Al crear una cita</small></span><input id="settingImmediate" type="checkbox" checked /></label>
               <label class="toggle-row"><span><strong>Recordatorio 24 horas antes</strong><small>Reduce olvidos e inasistencias</small></span><input id="setting24h" type="checkbox" checked /></label>
               <label class="toggle-row"><span><strong>Recordatorio 2 horas antes</strong><small>Último aviso al cliente</small></span><input id="setting2h" type="checkbox" checked /></label>
             </div>
-            <p class="notice">En este demo los mensajes se simulan; no se conecta a SMS, correo ni notificaciones push reales.</p>
+            <p class="notice">La confirmación y cancelación pueden enviarse con Supabase Edge Functions + Resend. Los avisos de 24 h y 2 h requieren desplegar la función programada incluida y activar su ejecución periódica.</p>
           </article>
         </div>
       </section>
@@ -616,22 +668,25 @@
             <h2>Gestión esencial</h2>
             <p>Para negocios que necesitan digitalizar su operación diaria.</p>
             <ul>
-              <li>Agenda y gestión de citas</li>
-              <li>Clientes, servicios y personal</li>
-              <li>Recordatorios simulados</li>
-              <li>Portal público de reservas</li>
+              <li>Portal público, agenda y cuentas de clientes</li>
+              <li>Hasta 4 servicios y 2 profesionales activos</li>
+              <li>Horarios semanales y días cerrados</li>
+              <li>Código de confirmación y comprobante descargable</li>
+              <li>CRM básico e historial de citas</li>
             </ul>
             <button class="btn btn-soft btn-block" data-plan-select="Básico">Usar Plan Básico</button>
           </article>
           <article id="proPlanCard" class="plan-option featured">
             <span class="plan-badge">PRO</span>
-            <h2>Datos para crecer</h2>
-            <p>Incluye las funciones del plan Básico y herramientas de inteligencia del negocio.</p>
+            <h2>Automatización y crecimiento</h2>
+            <p>Incluye el Plan Básico y añade automatización, control, personalización e inteligencia del negocio.</p>
             <ul>
-              <li>Horas pico y servicios rentables</li>
-              <li>Métricas de retención</li>
-              <li>Recomendaciones simuladas</li>
-              <li>Indicadores de no-shows</li>
+              <li>Profesionales y servicios sin límite del Plan Básico</li>
+              <li>Correos de confirmación, cancelación y recordatorios</li>
+              <li>Analítica avanzada, retención y pérdida estimada</li>
+              <li>Exportación CSV de citas, clientes e indicadores</li>
+              <li>Bitácora de actividad y trazabilidad</li>
+              <li>Personalización del portal y marca del negocio</li>
             </ul>
             <button class="btn btn-primary btn-block" data-plan-select="Pro">Usar Plan Pro</button>
           </article>
@@ -639,12 +694,20 @@
       </section>
 
       <section id="auditBusinessView" class="business-view hidden">
-        <article class="panel">
+        <div id="auditPlanLock" class="feature-lock hidden">
+          <span class="lock-icon">↺</span>
+          <div>
+            <strong>La bitácora y trazabilidad pertenecen al Plan Pro</strong>
+            <p>Permite identificar quién creó, actualizó o canceló cada registro y conservar evidencia para auditoría.</p>
+          </div>
+          <button class="btn btn-primary" data-business-view="subscription">Ver planes</button>
+        </div>
+        <article class="panel pro-content">
           <div class="panel-header wrap">
             <div><span class="eyebrow">TRAZABILIDAD</span><h2>Bitácora de actividad</h2></div>
             <button id="clearAuditBtn" class="btn btn-soft">Limpiar bitácora</button>
           </div>
-          <p class="notice neutral">Esta bitácora es simulada y representa el tipo de eventos que una versión productiva debería registrar para auditoría.</p>
+          <p class="notice neutral">En modo cloud, los eventos se almacenan en PostgreSQL y son visibles únicamente para el administrador del negocio.</p>
           <div id="auditList" class="audit-list"></div>
         </article>
       </section>
@@ -671,6 +734,35 @@
             <p class="notice">La API Key de Resend y el correo remitente se configuran como secretos de Supabase. No deben colocarse en GitHub ni en app.js.</p>
           </article>
         </div>
+
+        <article id="brandingPanel" class="panel branding-panel">
+          <div id="brandingPlanLock" class="feature-lock hidden">
+            <span class="lock-icon">✦</span>
+            <div>
+              <strong>La personalización del portal pertenece al Plan Pro</strong>
+              <p>Permite adaptar el color, la marca abreviada y el mensaje principal del negocio.</p>
+            </div>
+            <button class="btn btn-primary" data-business-view="subscription">Ver planes</button>
+          </div>
+          <div class="panel-header wrap pro-content">
+            <div>
+              <span class="eyebrow">MARCA DEL NEGOCIO</span>
+              <h2>Personalización del portal</h2>
+              <p class="panel-subtitle">Los cambios se reflejan en el portal público y se guardan en PostgreSQL.</p>
+            </div>
+            <div id="brandingPreview" class="branding-preview"><span data-brand-preview>BC</span></div>
+          </div>
+          <form id="brandingSettingsForm" class="form-stack pro-content">
+            <div class="form-grid">
+              <label>Siglas o marca corta<input id="brandLogoTextSetting" type="text" maxlength="3" value="BC" /></label>
+              <label>Color principal<input id="brandColorSetting" type="color" value="#2f6fe4" /></label>
+            </div>
+            <label>Mensaje principal del portal
+              <input id="bookingMessageSetting" type="text" maxlength="180" value="Reserva tu cita sin llamadas ni mensajes." />
+            </label>
+            <button class="btn btn-primary" type="submit">Guardar personalización</button>
+          </form>
+        </article>
 
         <article class="panel schedule-panel">
           <div class="panel-header wrap">

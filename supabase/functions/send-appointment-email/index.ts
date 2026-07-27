@@ -50,6 +50,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const appointmentId = Number(body.appointment_id);
+    const messageType = String(body.message_type || "confirmation");
     if (!Number.isFinite(appointmentId)) {
       return new Response(JSON.stringify({ error: "appointment_id es obligatorio." }), {
         status: 400,
@@ -100,16 +101,19 @@ Deno.serve(async (req: Request) => {
       ? `${publicSiteUrl.replace(/\/$/, "")}/?appointment=${encodeURIComponent(appointment.confirmation_code)}`
       : "";
 
-    const subject = `Cita confirmada - ${appointment.confirmation_code}`;
+    if (!["confirmation","cancellation","reminder24","reminder2"].includes(messageType)) return new Response(JSON.stringify({ error: "Tipo de mensaje inválido." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const titles: Record<string,string>={confirmation:"Tu cita está confirmada",cancellation:"Tu cita fue cancelada",reminder24:"Recordatorio: tu cita es mañana",reminder2:"Recordatorio: tu cita es en aproximadamente 2 horas"};
+    const subjects: Record<string,string>={confirmation:`Cita confirmada - ${appointment.confirmation_code}`,cancellation:`Cita cancelada - ${appointment.confirmation_code}`,reminder24:`Recordatorio de cita - ${appointment.confirmation_code}`,reminder2:`Tu cita se aproxima - ${appointment.confirmation_code}`};
+    const subject=subjects[messageType];
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#16213b">
         <div style="background:#0f1b3d;color:white;padding:28px;border-radius:16px 16px 0 0">
           <div style="font-size:12px;letter-spacing:.12em;color:#9fc0ff;font-weight:700">APPOINTMENTSAAS</div>
-          <h1 style="margin:8px 0 0;font-size:28px">Tu cita está confirmada</h1>
+          <h1 style="margin:8px 0 0;font-size:28px">${escapeHtml(titles[messageType])}</h1>
         </div>
         <div style="border:1px solid #dfe5ef;border-top:0;padding:28px;border-radius:0 0 16px 16px">
           <p>Hola <strong>${escapeHtml(appointment.client_name)}</strong>,</p>
-          <p>Tu reserva en <strong>${escapeHtml(business?.name)}</strong> fue registrada correctamente.</p>
+          <p>${messageType === "cancellation" ? "La reserva fue cancelada correctamente." : messageType.startsWith("reminder") ? `Te recordamos tu próxima reserva en <strong>${escapeHtml(business?.name)}</strong>.` : `Tu reserva en <strong>${escapeHtml(business?.name)}</strong> fue registrada correctamente.`}</p>
           <table style="width:100%;border-collapse:collapse;margin:22px 0">
             <tr><td style="padding:10px;background:#f5f7fb">Código</td><td style="padding:10px;font-weight:700">${escapeHtml(appointment.confirmation_code)}</td></tr>
             <tr><td style="padding:10px;background:#f5f7fb">Servicio</td><td style="padding:10px">${escapeHtml(service?.name)}</td></tr>
@@ -130,7 +134,7 @@ Deno.serve(async (req: Request) => {
       headers: {
         "Authorization": `Bearer ${resendApiKey}`,
         "Content-Type": "application/json",
-        "Idempotency-Key": `appointment-${appointment.id}`,
+        "Idempotency-Key": `appointment-${appointment.id}-${messageType}`,
       },
       body: JSON.stringify({
         from: resendFrom,
@@ -149,16 +153,13 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    await adminClient
-      .from("appointments")
-      .update({ email_status: "Enviado", email_sent_at: new Date().toISOString() })
-      .eq("id", appointment.id);
+    const sentAt=new Date().toISOString();const updatePayload: Record<string,unknown>={email_status:"Enviado"};if(messageType==="confirmation")updatePayload.email_sent_at=sentAt;if(messageType==="cancellation")updatePayload.cancellation_email_sent_at=sentAt;if(messageType==="reminder24")updatePayload.reminder_24h_sent_at=sentAt;if(messageType==="reminder2")updatePayload.reminder_2h_sent_at=sentAt;if(messageType.startsWith("reminder"))updatePayload.reminder_status="Enviado";await adminClient.from("appointments").update(updatePayload).eq("id",appointment.id);
 
     await adminClient.from("audit_logs").insert({
       business_id: appointment.business_id,
       actor_id: userData.user.id,
       actor_name: profile?.role === "client" ? appointment.client_name : "Usuario autorizado",
-      action: `Correo de confirmación enviado para ${appointment.confirmation_code}`,
+      action: `Correo ${messageType} enviado para ${appointment.confirmation_code}`,
     });
 
     return new Response(JSON.stringify({ id: resendPayload.id, sent: true }), {
