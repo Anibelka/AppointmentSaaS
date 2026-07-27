@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Demo funcional completo de AppointmentSaaS para negocios y clientes." />
+  <title>AppointmentSaaS · Demo completo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- PORTAL PÚBLICO / CLIENTE -->
+  <div id="publicPortal">
+    <header class="public-header">
+      <button class="brand brand-button" data-public-view="home" aria-label="Ir al inicio">
+        <span class="brand-mark">A</span>
+        <span>
+          <strong>AppointmentSaaS</strong>
+          <small>Reservas inteligentes</small>
+        </span>
+      </button>
+      <nav class="public-nav">
+        <button data-public-view="home">Inicio</button>
+        <button data-public-view="booking">Reservar</button>
+        <button data-public-view="lookup">Consultar cita</button>
+        <button id="openClientAuth" class="btn btn-soft">Mi cuenta</button>
+        <button id="openBusinessLogin" class="btn btn-outline">Acceso del negocio</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="homePublicView" class="public-view">
+        <div class="public-hero">
+          <div class="hero-copy">
+            <span class="eyebrow"><span data-business-name>Barbería Caribe</span> · DEMO</span>
+            <h1>Reserva tu cita sin llamadas ni mensajes.</h1>
+            <p>
+              Elige el servicio, el profesional y la hora disponible. Recibe una confirmación
+              inmediata y consulta tu reserva cuando lo necesites.
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary btn-lg" data-public-view="booking">Reservar ahora</button>
+              <button class="btn btn-soft btn-lg" data-public-view="lookup">Consultar mi cita</button>
+            </div>
+            <div class="trust-row">
+              <span>✓ Reserva en minutos</span>
+              <span>✓ Confirmación inmediata</span>
+              <span>✓ Datos de prueba</span>
+            </div>
+          </div>
+          <div class="hero-demo-card">
+            <div class="phone-shell">
+              <div class="phone-top"></div>
+              <div class="phone-content">
+                <span class="eyebrow">PRÓXIMA DISPONIBILIDAD</span>
+                <h3 id="publicNextAvailability">Consultando...</h3>
+                <div class="mini-service">
+                  <div class="service-icon">✂</div>
+                  <div>
+                    <strong id="publicNextService">Corte + Barba</strong>
+                    <small id="publicNextServiceMeta">45 min · RD$ 1,200</small>
+                  </div>
+                </div>
+                <button class="btn btn-primary btn-block" data-public-view="booking">Elegir horario</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="public-section">
+          <div class="section-title">
+            <span class="eyebrow">SERVICIOS</span>
+            <h2>Encuentra el servicio ideal</h2>
+            <p>Precios y duración disponibles antes de reservar.</p>
+          </div>
+          <div id="publicServicesGrid" class="service-grid"></div>
+        </section>
+
+        <section class="public-section soft-section">
+          <div class="section-title">
+            <span class="eyebrow">PROFESIONALES</span>
+            <h2>Reserva con tu especialista favorito</h2>
+          </div>
+          <div id="publicStaffGrid" class="staff-grid"></div>
+        </section>
+      </section>
+
+      <section id="bookingPublicView" class="public-view hidden">
+        <div class="booking-page">
+          <div class="booking-intro">
+            <span class="eyebrow">RESERVA EN LÍNEA</span>
+            <h1>Agenda tu próxima cita</h1>
+            <p>Completa los pasos. La cita aparecerá automáticamente en el panel del negocio.</p>
+          </div>
+
+          <div class="booking-layout">
+            <article class="booking-card">
+              <div class="steps">
+                <span class="step active" data-step-indicator="1">1. Servicio</span>
+                <span class="step" data-step-indicator="2">2. Horario</span>
+                <span class="step" data-step-indicator="3">3. Datos</span>
+                <span class="step" data-step-indicator="4">4. Confirmación</span>
+              </div>
+
+              <form id="publicBookingForm">
+                <div class="booking-step" data-booking-step="1">
+                  <h2>Selecciona un servicio</h2>
+                  <div id="bookingServices" class="select-cards"></div>
+                  <div class="form-actions end">
+                    <button type="button" class="btn btn-primary" data-next-step>Continuar</button>
+                  </div>
+                </div>
+
+                <div class="booking-step hidden" data-booking-step="2">
+                  <h2>Elige profesional, fecha y hora</h2>
+                  <div class="form-grid">
+                    <label>
+                      Profesional
+                      <select id="bookingStaff" required></select>
+                    </label>
+                    <label>
+                      Fecha
+                      <input id="bookingDate" type="date" required />
+                    </label>
+                  </div>
+                  <div id="bookingScheduleNotice" class="schedule-notice"></div>
+                  <div>
+                    <label class="field-label">Hora disponible</label>
+                    <div id="bookingTimes" class="time-grid"></div>
+                  </div>
+                  <p class="timezone-note">Horarios calculados con la zona <strong>America/Santo_Domingo (UTC-4)</strong>. Las horas ya transcurridas no se muestran.</p>
+                  <div class="form-actions">
+                    <button type="button" class="btn btn-soft" data-prev-step>Volver</button>
+                    <button type="button" class="btn btn-primary" data-next-step>Continuar</button>
+                  </div>
+                </div>
+
+                <div class="booking-step hidden" data-booking-step="3">
+                  <h2>Completa tus datos</h2>
+                  <div id="bookingAccountHint" class="account-hint"></div>
+                  <div class="form-grid">
+                    <label>
+                      Nombre completo
+                      <input id="bookingClientName" type="text" placeholder="Ej. Laura Pérez" required />
+                    </label>
+                    <label>
+                      Teléfono
+                      <input id="bookingClientPhone" type="tel" placeholder="809-000-0000" required />
+                    </label>
+                    <label>
+                      Correo electrónico
+                      <input id="bookingClientEmail" type="email" placeholder="correo@ejemplo.com" required />
+                    </label>
+                    <label>
+                      Nota opcional
+                      <input id="bookingNotes" type="text" placeholder="Preferencias o comentario" />
+                    </label>
+                  </div>
+                  <label class="check-row">
+                    <input id="bookingConsent" type="checkbox" required />
+                    <span>Acepto recibir confirmaciones y recordatorios relacionados con esta cita.</span>
+                  </label>
+                  <div class="form-actions">
+                    <button type="button" class="btn btn-soft" data-prev-step>Volver</button>
+                    <button type="button" class="btn btn-primary" data-next-step>Revisar reserva</button>
+                  </div>
+                </div>
+
+                <div class="booking-step hidden" data-booking-step="4">
+                  <h2>Revisa tu reserva</h2>
+                  <div id="bookingSummary" class="booking-summary"></div>
+                  <div class="form-actions">
+                    <button type="button" class="btn btn-soft" data-prev-step>Modificar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar cita</button>
+                  </div>
+                </div>
+              </form>
+            </article>
+
+            <aside class="business-info-card">
+              <span class="eyebrow" data-business-name>Barbería Caribe</span>
+              <h3>Información del negocio</h3>
+              <div class="info-list">
+                <div><strong>Horario</strong><span id="publicBusinessHours">Lun–Sáb · 9:00 AM–8:00 PM</span></div>
+                <div><strong>Dirección</strong><span id="publicBusinessAddress">Av. Winston Churchill, Santo Domingo</span></div>
+                <div><strong>Teléfono</strong><span id="publicBusinessPhone">809-555-0101</span></div>
+                <div><strong>Política</strong><span>Cancelación permitida hasta 2 horas antes.</span></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section id="lookupPublicView" class="public-view hidden">
+        <div class="lookup-page">
+          <div class="lookup-card">
+            <span class="eyebrow">MI CITA</span>
+            <h1>Consulta o cancela tu reserva</h1>
+            <p>Introduce el código de confirmación recibido al reservar.</p>
+            <form id="lookupForm" class="inline-form">
+              <input id="lookupCode" type="text" placeholder="Ej. APT-123456" required />
+              <button class="btn btn-primary" type="submit">Buscar</button>
+            </form>
+            <div id="lookupResult"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="bookingSuccessPublicView" class="public-view hidden">
+        <div class="success-page">
+          <div class="success-card">
+            <div class="success-icon">✓</div>
+            <span class="eyebrow">CITA CONFIRMADA</span>
+            <h1>Tu reserva está lista</h1>
+            <p>Guarda este código para consultar, cancelar o identificar la cita.</p>
+            <div id="successCode" class="confirmation-code"></div>
+            <div id="successDetails" class="booking-summary"></div>
+            <div id="successEmailStatus" class="email-status"></div>
+            <div class="confirmation-actions">
+              <button id="copySuccessCode" class="btn btn-soft">Copiar código</button>
+              <button id="downloadCalendarBtn" class="btn btn-soft">Añadir al calendario</button>
+              <button id="downloadReceiptBtn" class="btn btn-soft">Descargar comprobante</button>
+              <button id="prepareEmailBtn" class="btn btn-soft">Abrir en mi correo</button>
+            </div>
+            <div class="hero-actions center">
+              <button id="successAccountBtn" class="btn btn-primary">Ver mis citas</button>
+              <button class="btn btn-soft" data-public-view="lookup">Consultar por código</button>
+              <button class="btn btn-soft" data-public-view="home">Volver al inicio</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="clientAccountPublicView" class="public-view hidden">
+        <div class="client-account-page">
+          <div class="client-account-header">
+            <div>
+              <span class="eyebrow">PORTAL DEL CLIENTE</span>
+              <h1 id="clientWelcomeTitle">Mis citas</h1>
+              <p>Consulta próximas reservas, historial y códigos de confirmación.</p>
+            </div>
+            <div class="hero-actions">
+              <button class="btn btn-primary" data-public-view="booking">Nueva reserva</button>
+              <button id="clientLogoutBtn" class="btn btn-soft">Cerrar sesión</button>
+            </div>
+          </div>
+          <div class="client-account-grid">
+            <aside class="client-profile-card">
+              <div id="clientProfileAvatar" class="client-avatar">CL</div>
+              <strong id="clientProfileName">Cliente</strong>
+              <span id="clientProfileEmail">correo@ejemplo.com</span>
+              <span id="clientProfilePhone">809-000-0000</span>
+              <div class="client-security-note">
+                <strong>Demo académico</strong>
+                <span>La cuenta se guarda localmente en este navegador. En producción las contraseñas se protegerían con hashing y una base de datos.</span>
+              </div>
+            </aside>
+            <div>
+              <div class="account-section-title">
+                <h2>Próximas citas</h2>
+                <span id="clientUpcomingCount">0</span>
+              </div>
+              <div id="clientUpcomingAppointments" class="client-appointments-list"></div>
+              <div class="account-section-title history-title">
+                <h2>Historial</h2>
+              </div>
+              <div id="clientAppointmentHistory" class="client-appointments-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="public-footer">
+      <div>
+        <strong>AppointmentSaaS</strong>
+        <span>Demo académico con datos simulados.</span>
+      </div>
+      <button id="footerBusinessLogin">Panel del negocio</button>
+    </footer>
+  </div>
+
+
+  <!-- MODAL DE CUENTA DEL CLIENTE -->
+  <div id="clientAuthModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="clientAuthTitle">
+    <div class="modal-backdrop" data-close-client-modal></div>
+    <div class="modal-card client-auth-card">
+      <button class="modal-close" data-close-client-modal aria-label="Cerrar">×</button>
+      <span class="eyebrow">PORTAL DEL CLIENTE</span>
+      <h2 id="clientAuthTitle">Inicia sesión o crea tu cuenta</h2>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-auth-tab="login">Iniciar sesión</button>
+        <button class="auth-tab" data-auth-tab="register">Registrarme</button>
+      </div>
+
+      <form id="clientLoginForm" class="form-stack auth-panel">
+        <label>Correo<input id="clientLoginEmail" type="email" value="cliente@appointmentsaas.com" required /></label>
+        <label>Contraseña<input id="clientLoginPassword" type="password" value="Cliente123!" required /></label>
+        <button class="btn btn-primary btn-block" type="submit">Entrar a mi cuenta</button>
+      </form>
+
+      <form id="clientRegisterForm" class="form-stack auth-panel hidden">
+        <label>Nombre completo<input id="clientRegisterName" type="text" required /></label>
+        <label>Teléfono<input id="clientRegisterPhone" type="tel" placeholder="809-000-0000" required /></label>
+        <label>Correo<input id="clientRegisterEmail" type="email" required /></label>
+        <label>Contraseña<input id="clientRegisterPassword" type="password" minlength="6" required /></label>
+        <button class="btn btn-primary btn-block" type="submit">Crear cuenta</button>
+      </form>
+
+      <div class="credentials-box">
+        <strong>Cliente demo:</strong><code>cliente@appointmentsaas.com</code>
+        <strong>Contraseña:</strong><code>Cliente123!</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL LOGIN EMPRESA -->
+  <div id="businessLoginModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="businessLoginTitle">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card">
+      <button class="modal-close" data-close-modal aria-label="Cerrar">×</button>
+      <span class="eyebrow">ACCESO DEL NEGOCIO</span>
+      <h2 id="businessLoginTitle">Panel administrativo</h2>
+      <p class="muted">Ingresa con las credenciales de demostración.</p>
+      <form id="businessLoginForm" class="form-stack">
+        <label>
+          Correo
+          <input id="businessEmail" type="email" value="demo@appointmentsaas.com" required />
+        </label>
+        <label>
+          Contraseña
+          <input id="businessPassword" type="password" value="Demo123!" required />
+        </label>
+        <button class="btn btn-primary btn-block" type="submit">Ingresar</button>
+      </form>
+      <div class="credentials-box credentials-multi">
+        <strong>Administrador:</strong><code>demo@appointmentsaas.com</code>
+        <strong>Contraseña:</strong><code>Demo123!</code>
+        <strong>Empleado:</strong><code>empleado@appointmentsaas.com</code>
+        <strong>Contraseña:</strong><code>Empleado123!</code>
+      </div>
+      <p class="credential-note">El administrador ve todos los módulos. El empleado solo ve sus citas y clientes asignados.</p>
+    </div>
+  </div>
+
+  <!-- PANEL DEL NEGOCIO -->
+  <div id="businessPortal" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">A</span>
+        <span>
+          <strong>AppointmentSaaS</strong>
+          <small>Panel del negocio</small>
+        </span>
+      </div>
+
+      <nav class="side-nav">
+        <button class="nav-item active" data-business-view="dashboard">Resumen</button>
+        <button class="nav-item" data-business-view="appointments">Agenda</button>
+        <button class="nav-item" data-business-view="clients">Clientes</button>
+        <button class="nav-item" data-business-view="services" data-admin-only>Servicios</button>
+        <button class="nav-item" data-business-view="staff" data-admin-only>Personal</button>
+        <button class="nav-item" data-business-view="analytics" data-admin-only>Analítica <span class="nav-pro-tag">PRO</span></button>
+        <button class="nav-item" data-business-view="notifications" data-admin-only>Recordatorios</button>
+        <button class="nav-item" data-business-view="subscription" data-admin-only>Suscripción</button>
+        <button class="nav-item" data-business-view="audit" data-admin-only>Bitácora</button>
+        <button class="nav-item" data-business-view="settings" data-admin-only>Configuración</button>
+      </nav>
+
+      <div class="plan-card">
+        <span id="sidebarPlanLabel">PLAN PRO</span>
+        <strong data-business-name>Barbería Caribe</strong>
+        <small id="sidebarPlanDetail">Analítica y recordatorios habilitados</small>
+      </div>
+
+      <button id="exitBusinessPortal" class="btn btn-ghost btn-block">Volver al portal público</button>
+    </aside>
+
+    <main class="business-main">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">DEMO ADMINISTRATIVO</span>
+          <h1 id="businessPageTitle">Resumen del negocio</h1>
+        </div>
+        <div class="topbar-actions">
+          <button id="resetDemoBtn" class="btn btn-soft" data-admin-only>Restablecer demo</button>
+          <div class="user-chip">
+            <span id="sessionAvatar" class="avatar">AS</span>
+            <span>
+              <strong id="sessionUserName">Anibelka Santana</strong>
+              <small id="sessionRoleName">Administradora</small>
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <section id="dashboardBusinessView" class="business-view">
+        <div class="business-hero">
+          <div>
+            <span class="eyebrow light">HOY EN <span data-business-name>Barbería Caribe</span></span>
+            <h2>Gestiona la operación desde un solo lugar</h2>
+            <p>Las reservas creadas desde el portal del cliente aparecen automáticamente aquí.</p>
+          </div>
+          <button id="dashboardNewAppointmentBtn" class="btn btn-white" data-business-view="appointments" data-admin-only>Nueva cita</button>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card accent">
+            <span id="metricTodayLabel">Citas de hoy</span>
+            <strong id="metricToday">0</strong>
+            <small id="metricTodayDetail">Reservas no canceladas</small>
+          </article>
+          <article class="metric-card">
+            <span id="metricRevenueLabel">Ingresos estimados</span>
+            <strong id="metricRevenue">RD$ 0</strong>
+            <small id="metricRevenueDetail">Servicios programados</small>
+          </article>
+          <article class="metric-card">
+            <span id="metricClientsLabel">Clientes únicos</span>
+            <strong id="metricClients">0</strong>
+            <small id="metricClientsDetail">Directorio consolidado</small>
+          </article>
+          <article class="metric-card">
+            <span id="metricRemindersLabel">Recordatorios</span>
+            <strong id="metricReminders">0</strong>
+            <small id="metricRemindersDetail">Enviados o programados</small>
+          </article>
+        </div>
+
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">AGENDA</span><h2>Próximas citas</h2></div>
+              <button class="link-button" data-business-view="appointments">Ver todas</button>
+            </div>
+            <div id="dashboardAppointments" class="stack-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">INDICADORES</span><h2>Lectura rápida</h2></div>
+            </div>
+            <div class="insight-list">
+              <div><span>Hora pico</span><strong id="quickPeak">—</strong></div>
+              <div><span>Servicio más reservado</span><strong id="quickTopService">—</strong></div>
+              <div><span>Próximo cliente</span><strong id="quickNextClient">—</strong></div>
+              <div><span>Tasa de cancelación</span><strong id="quickCancelRate">0%</strong></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="appointmentsBusinessView" class="business-view hidden">
+        <div class="appointments-layout">
+          <article id="manualAppointmentPanel" class="panel sticky" data-admin-only>
+            <div class="panel-header">
+              <div><span class="eyebrow">REGISTRO MANUAL</span><h2>Nueva cita</h2></div>
+            </div>
+            <form id="adminAppointmentForm" class="form-stack">
+              <label>Cliente<input id="adminClientName" type="text" required /></label>
+              <label>Teléfono<input id="adminClientPhone" type="tel" required /></label>
+              <label>Correo<input id="adminClientEmail" type="email" required /></label>
+              <label>Servicio<select id="adminServiceSelect" required></select></label>
+              <label>Profesional<select id="adminStaffSelect" required></select></label>
+              <div class="form-grid">
+                <label>Fecha<input id="adminDate" type="date" required /></label>
+                <label>Hora<input id="adminTime" type="time" required /></label>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit">Agregar a la agenda</button>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header wrap">
+              <div><span class="eyebrow">AGENDA</span><h2>Citas programadas</h2></div>
+              <div class="toolbar">
+                <input id="appointmentSearch" type="search" placeholder="Buscar cliente..." />
+                <select id="appointmentStatusFilter">
+                  <option value="all">Todos los estados</option>
+                  <option value="Pendiente">Pendientes</option>
+                  <option value="Confirmada">Confirmadas</option>
+                  <option value="Completada">Completadas</option>
+                  <option value="No asistió">No asistió</option>
+                  <option value="Cancelada">Canceladas</option>
+                </select>
+              </div>
+            </div>
+            <div id="appointmentsList" class="stack-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="clientsBusinessView" class="business-view hidden">
+        <article class="panel">
+          <div class="panel-header wrap">
+            <div><span class="eyebrow">CRM BÁSICO</span><h2>Clientes e historial</h2></div>
+            <input id="clientSearch" type="search" placeholder="Buscar cliente..." />
+          </div>
+          <div id="clientsTable" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section id="servicesBusinessView" class="business-view hidden">
+        <div class="two-column balanced">
+          <article class="panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">CATÁLOGO</span><h2>Servicios disponibles</h2></div>
+            </div>
+            <div id="servicesAdminList" class="stack-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">NUEVO SERVICIO</span><h2>Agregar al catálogo</h2></div>
+            </div>
+            <form id="serviceForm" class="form-stack">
+              <label>Nombre<input id="serviceName" type="text" placeholder="Ej. Diseño de barba" required /></label>
+              <div class="form-grid">
+                <label>Precio (RD$)<input id="servicePrice" type="number" min="1" required /></label>
+                <label>Duración (min)<input id="serviceDuration" type="number" min="10" step="5" required /></label>
+              </div>
+              <label>Descripción<input id="serviceDescription" type="text" placeholder="Breve descripción" required /></label>
+              <button class="btn btn-primary" type="submit">Guardar servicio</button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section id="staffBusinessView" class="business-view hidden">
+        <div class="two-column balanced">
+          <article class="panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">EQUIPO</span><h2>Profesionales</h2></div>
+            </div>
+            <div id="staffAdminList" class="staff-admin-grid"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">NUEVO PROFESIONAL</span><h2>Agregar integrante</h2></div>
+            </div>
+            <form id="staffForm" class="form-stack">
+              <label>Nombre<input id="staffName" type="text" required /></label>
+              <label>Especialidad<input id="staffSpecialty" type="text" required /></label>
+              <label>Horario<input id="staffSchedule" type="text" placeholder="Ej. Lun–Vie · 9:00 AM–6:00 PM" required /></label>
+              <button class="btn btn-primary" type="submit">Agregar profesional</button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section id="analyticsBusinessView" class="business-view hidden">
+        <div id="analyticsPlanLock" class="feature-lock hidden">
+          <span class="lock-icon">◆</span>
+          <div>
+            <strong>La analítica avanzada pertenece al Plan Pro</strong>
+            <p>Cambia al Plan Pro desde Suscripción para habilitar horas pico, rentabilidad y métricas de retención.</p>
+          </div>
+          <button class="btn btn-primary" data-business-view="subscription">Ver planes</button>
+        </div>
+        <div class="metric-grid">
+          <article class="metric-card accent"><span>Hora pico</span><strong id="analyticsPeak">—</strong><small>Mayor demanda</small></article>
+          <article class="metric-card"><span>Servicio top</span><strong id="analyticsTopService">—</strong><small id="analyticsTopServiceDetail">—</small></article>
+          <article class="metric-card"><span>Ingresos proyectados</span><strong id="analyticsRevenue">RD$ 0</strong><small>Citas activas y completadas</small></article>
+          <article class="metric-card"><span>Tasa de no-show</span><strong id="analyticsNoShowRate">0%</strong><small>Según citas finalizadas</small></article>
+        </div>
+        <div class="metric-grid retention-grid">
+          <article class="metric-card"><span>Clientes recurrentes</span><strong id="analyticsRepeatClients">0</strong><small id="analyticsRepeatDetail">0% de retorno</small></article>
+          <article class="metric-card"><span>Clientes nuevos</span><strong id="analyticsNewClients">0</strong><small>Una sola reserva registrada</small></article>
+          <article class="metric-card"><span>Citas completadas</span><strong id="analyticsCompleted">0</strong><small>Servicios realizados</small></article>
+          <article class="metric-card"><span>No asistieron</span><strong id="analyticsNoShows">0</strong><small>Ausencias registradas</small></article>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">RENTABILIDAD</span><h2>Ingresos por servicio</h2></div></div>
+            <div id="serviceBars" class="bars"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">DEMANDA</span><h2>Horas con más citas</h2></div></div>
+            <div id="hourCards" class="hour-grid"></div>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="panel-header"><div><span class="eyebrow">RECOMENDACIONES</span><h2>Decisiones sugeridas</h2></div></div>
+          <div id="recommendations" class="recommendation-grid"></div>
+        </article>
+      </section>
+
+      <section id="notificationsBusinessView" class="business-view hidden">
+        <div class="two-column balanced">
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">COLA DE MENSAJES</span><h2>Recordatorios</h2></div></div>
+            <div id="notificationsList" class="stack-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">CONFIGURACIÓN SIMULADA</span><h2>Reglas de envío</h2></div></div>
+            <div class="settings-stack">
+              <label class="toggle-row"><span><strong>Confirmación inmediata</strong><small>Al crear una cita</small></span><input id="settingImmediate" type="checkbox" checked /></label>
+              <label class="toggle-row"><span><strong>Recordatorio 24 horas antes</strong><small>Reduce olvidos e inasistencias</small></span><input id="setting24h" type="checkbox" checked /></label>
+              <label class="toggle-row"><span><strong>Recordatorio 2 horas antes</strong><small>Último aviso al cliente</small></span><input id="setting2h" type="checkbox" checked /></label>
+            </div>
+            <p class="notice">En este demo los mensajes se simulan; no se conecta a SMS, correo ni notificaciones push reales.</p>
+          </article>
+        </div>
+      </section>
+
+
+      <section id="subscriptionBusinessView" class="business-view hidden">
+        <div class="subscription-intro panel">
+          <span class="eyebrow">MODELO SAAS B2B</span>
+          <h2>Selecciona el plan del negocio</h2>
+          <p>El cambio es demostrativo y permite evidenciar qué funciones pertenecen al Plan Básico y al Plan Pro.</p>
+        </div>
+        <div class="plan-grid">
+          <article id="basicPlanCard" class="plan-option">
+            <span class="plan-badge">BÁSICO</span>
+            <h2>Gestión esencial</h2>
+            <p>Para negocios que necesitan digitalizar su operación diaria.</p>
+            <ul>
+              <li>Agenda y gestión de citas</li>
+              <li>Clientes, servicios y personal</li>
+              <li>Recordatorios simulados</li>
+              <li>Portal público de reservas</li>
+            </ul>
+            <button class="btn btn-soft btn-block" data-plan-select="Básico">Usar Plan Básico</button>
+          </article>
+          <article id="proPlanCard" class="plan-option featured">
+            <span class="plan-badge">PRO</span>
+            <h2>Datos para crecer</h2>
+            <p>Incluye las funciones del plan Básico y herramientas de inteligencia del negocio.</p>
+            <ul>
+              <li>Horas pico y servicios rentables</li>
+              <li>Métricas de retención</li>
+              <li>Recomendaciones simuladas</li>
+              <li>Indicadores de no-shows</li>
+            </ul>
+            <button class="btn btn-primary btn-block" data-plan-select="Pro">Usar Plan Pro</button>
+          </article>
+        </div>
+      </section>
+
+      <section id="auditBusinessView" class="business-view hidden">
+        <article class="panel">
+          <div class="panel-header wrap">
+            <div><span class="eyebrow">TRAZABILIDAD</span><h2>Bitácora de actividad</h2></div>
+            <button id="clearAuditBtn" class="btn btn-soft">Limpiar bitácora</button>
+          </div>
+          <p class="notice neutral">Esta bitácora es simulada y representa el tipo de eventos que una versión productiva debería registrar para auditoría.</p>
+          <div id="auditList" class="audit-list"></div>
+        </article>
+      </section>
+
+      <section id="settingsBusinessView" class="business-view hidden">
+        <div class="two-column balanced">
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">NEGOCIO</span><h2>Perfil público</h2></div></div>
+            <form id="businessSettingsForm" class="form-stack">
+              <label>Nombre del negocio<input id="businessNameSetting" type="text" value="Barbería Caribe" /></label>
+              <label>Teléfono<input id="businessPhoneSetting" type="tel" value="809-555-0101" /></label>
+              <label>Dirección<input id="businessAddressSetting" type="text" value="Av. Winston Churchill, Santo Domingo" /></label>
+              <label>Zona horaria<input type="text" value="America/Santo_Domingo (UTC-4)" disabled /></label>
+              <button class="btn btn-primary" type="submit">Guardar perfil</button>
+            </form>
+          </article>
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">CORREO</span><h2>Confirmaciones automáticas</h2></div></div>
+            <form id="emailSettingsForm" class="form-stack">
+              <label class="toggle-row compact">
+                <span><strong>Habilitar correo real con EmailJS</strong><small>Requiere una cuenta y plantilla configurada.</small></span>
+                <input id="emailEnabledSetting" type="checkbox" />
+              </label>
+              <label>Service ID<input id="emailServiceIdSetting" type="text" placeholder="service_xxxxx" /></label>
+              <label>Template ID<input id="emailTemplateIdSetting" type="text" placeholder="template_xxxxx" /></label>
+              <label>Public Key<input id="emailPublicKeySetting" type="text" placeholder="Clave pública de EmailJS" /></label>
+              <button class="btn btn-primary" type="submit">Guardar configuración de correo</button>
+            </form>
+            <p class="notice">Sin estas credenciales, el demo mostrará la confirmación en pantalla y permitirá descargar el comprobante, pero no enviará un correo automático real.</p>
+          </article>
+        </div>
+
+        <article class="panel schedule-panel">
+          <div class="panel-header wrap">
+            <div>
+              <span class="eyebrow">DISPONIBILIDAD</span>
+              <h2>Horario semanal del local</h2>
+              <p class="panel-subtitle">Los horarios disponibles para clientes se generan a partir de esta configuración.</p>
+            </div>
+            <span class="timezone-chip">America/Santo_Domingo · UTC-4</span>
+          </div>
+          <form id="weeklyScheduleForm">
+            <div id="weeklyScheduleEditor" class="weekly-schedule"></div>
+            <button class="btn btn-primary" type="submit">Guardar horario semanal</button>
+          </form>
+        </article>
+
+        <div class="two-column balanced">
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">EXCEPCIONES</span><h2>Días cerrados especiales</h2></div></div>
+            <form id="closureForm" class="form-stack">
+              <label>Fecha<input id="closureDate" type="date" required /></label>
+              <label>Motivo<input id="closureReason" type="text" placeholder="Ej. Feriado o mantenimiento" required /></label>
+              <button class="btn btn-primary" type="submit">Agregar cierre</button>
+            </form>
+            <div id="closuresList" class="closures-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header"><div><span class="eyebrow">SEGURIDAD</span><h2>Controles representados</h2></div></div>
+            <div class="security-list">
+              <div><strong>Roles</strong><span>Administrador, empleado y cliente.</span></div>
+              <div><strong>Sesión</strong><span>Accesos separados para negocio, empleado y cliente.</span></div>
+              <div><strong>Datos</strong><span>Almacenamiento local del navegador para fines académicos.</span></div>
+              <div><strong>Producción</strong><span>La arquitectura propuesta contempla HTTPS, JWT, hashing y PostgreSQL privada.</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
