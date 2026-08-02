@@ -5,6 +5,7 @@ const CLIENT_SESSION_KEY = "appointmentsaas_client_session_v4";
 const TIME_ZONE = "America/Santo_Domingo";
 const SLOT_INTERVAL_MINUTES = 30;
 const CANCEL_LIMIT_HOURS = 2;
+const PENDING_BOOKING_KEY = "appointmentsaas_pending_booking_v1";
 const BASIC_LIMITS = { services: 4, staff: 2 };
 let cloudReady = false;
 let cloudSyncTimer = null;
@@ -143,6 +144,66 @@ let bookingStep = 1;
 let bookingDraft = {};
 let lastConfirmedAppointmentId = null;
 let currentBusinessView = "dashboard";
+
+function savePendingBooking() {
+  collectBookingInputs();
+  sessionStorage.setItem(PENDING_BOOKING_KEY, JSON.stringify({
+    createdAt: Date.now(),
+    step: bookingStep,
+    draft: { ...bookingDraft }
+  }));
+}
+function loadPendingBooking() {
+  try {
+    const pending = JSON.parse(sessionStorage.getItem(PENDING_BOOKING_KEY));
+    if (!pending?.draft || Date.now() - Number(pending.createdAt || 0) > 30 * 60 * 1000) {
+      sessionStorage.removeItem(PENDING_BOOKING_KEY);
+      return null;
+    }
+    return pending;
+  } catch {
+    sessionStorage.removeItem(PENDING_BOOKING_KEY);
+    return null;
+  }
+}
+function clearPendingBooking() {
+  sessionStorage.removeItem(PENDING_BOOKING_KEY);
+}
+function showBookingWithoutReset() {
+  const pending = loadPendingBooking();
+  if (!pending) return false;
+
+  bookingDraft = { ...pending.draft };
+  const client = getClientSession();
+  if (client) {
+    bookingDraft.client = client.name;
+    bookingDraft.phone = formatPhone(client.phone);
+    bookingDraft.email = client.email;
+  }
+
+  $$(".public-view").forEach(view => view.classList.add("hidden"));
+  $("#bookingPublicView").classList.remove("hidden");
+
+  $("#bookingDate").min = zonedToday();
+  $("#bookingDate").value = bookingDraft.date;
+  $("#bookingStaff").value = String(bookingDraft.staffId || "");
+  $("#bookingClientName").value = bookingDraft.client || "";
+  $("#bookingClientPhone").value = formatPhone(bookingDraft.phone || "");
+  $("#bookingClientEmail").value = bookingDraft.email || "";
+  $("#bookingNotes").value = bookingDraft.notes || "";
+  $("#bookingConsent").checked = true;
+
+  bookingStep = 4;
+  renderBookingStep();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  return true;
+}
+function resumePendingBookingAfterAuth() {
+  if (!showBookingWithoutReset()) return false;
+  showToast("Sesión iniciada. Confirmando tu cita...");
+  setTimeout(() => $("#publicBookingForm").requestSubmit(), 0);
+  return true;
+}
 
 function loadState() {
   try {
@@ -632,6 +693,7 @@ $("#publicBookingForm").addEventListener("submit", async e => {
   const error = validateSlot(bookingDraft.serviceId,bookingDraft.staffId,bookingDraft.date,bookingDraft.time);
   if (error) { showToast(error); bookingStep=2; renderBookingStep(); return; }
   if (cloudReady && !getClientSession()) {
+    savePendingBooking();
     showToast("Inicia sesión o crea una cuenta para confirmar la reserva");
     openClientAuth("login");
     return;
@@ -653,6 +715,7 @@ $("#publicBookingForm").addEventListener("submit", async e => {
       addAudit(`Cita ${appointment.code} creada desde el portal`, appointment.client);
       saveState(); renderAll();
     }
+    clearPendingBooking();
     showBookingSuccess(appointment);
     const emailResult = await sendRealEmail(appointment);
     $("#successEmailStatus").className = `email-status ${emailResult.sent?"success":emailResult.error?"error":""}`;
@@ -782,7 +845,12 @@ $("#clientLoginForm").addEventListener("submit",async e=>{
       setClientSession({id:account.id,name:account.name,phone:account.phone,email:account.email});
       addAudit("Inicio de sesión del cliente",account.name);
     }
-    closeClientAuth();renderAll();setPublicView("clientAccount");showToast("Sesión iniciada");
+    closeClientAuth();
+    renderAll();
+    if (!resumePendingBookingAfterAuth()) {
+      setPublicView("clientAccount");
+      showToast("Sesión iniciada");
+    }
   } catch (error) { console.error(error); showToast(error.message || "No se pudo iniciar sesión"); }
 });
 $("#clientRegisterForm").addEventListener("submit",async e=>{
@@ -804,7 +872,12 @@ $("#clientRegisterForm").addEventListener("submit",async e=>{
       setClientSession({id:account.id,name:account.name,phone:account.phone,email:account.email});
       addAudit("Cuenta de cliente creada",account.name);
     }
-    closeClientAuth();renderAll();setPublicView("clientAccount");showToast("Cuenta creada");
+    closeClientAuth();
+    renderAll();
+    if (!resumePendingBookingAfterAuth()) {
+      setPublicView("clientAccount");
+      showToast("Cuenta creada");
+    }
   } catch (error) { console.error(error); showToast(error.message || "No se pudo crear la cuenta"); }
 });
 $("#clientLogoutBtn").addEventListener("click",async ()=>{

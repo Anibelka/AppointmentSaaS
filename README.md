@@ -160,3 +160,17 @@ En una base existente ejecuta:
 ```text
 supabase/migrations/005_phone_normalization_and_client_dedup.sql
 ```
+
+
+## Continuidad de la reserva después de iniciar sesión
+
+Cuando un visitante selecciona servicio, profesional, fecha y hora y luego se le solicita autenticarse, AppointmentSaaS conserva temporalmente la reserva en `sessionStorage`.
+
+Después de iniciar sesión o crear una cuenta:
+
+1. Se recupera la selección.
+2. Se vuelve al resumen de la reserva.
+3. Se confirma automáticamente.
+4. La reserva temporal se elimina solo después de que PostgreSQL responde correctamente.
+
+La reserva pendiente expira después de 30 minutos.
